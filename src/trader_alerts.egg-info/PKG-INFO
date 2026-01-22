@@ -1,0 +1,15 @@
+Metadata-Version: 2.4
+Name: trader-alerts
+Version: 0.1.0
+Summary: Six macro/positioning indicators with bull/bear alerts (CLI)
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic==2.10.4
+Requires-Dist: pydantic-settings==2.7.1
+Requires-Dist: PyYAML==6.0.2
+Requires-Dist: requests==2.32.3
+Requires-Dist: rich==13.9.4
+Requires-Dist: typer==0.15.1
+Requires-Dist: click==8.1.7
+
+
