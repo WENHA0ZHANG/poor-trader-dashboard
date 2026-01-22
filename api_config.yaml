@@ -1,0 +1,22 @@
+# Optional: Integrate your own "real-time API" (universal JSON config)
+# You can use any HTTP API (self-built/paid data providers/middleware), as long as it returns JSON.
+#
+# Configuration item description:
+# - url: API address
+# - method: GET/POST...
+# - headers/params: request headers/parameters
+# - value_path: path to extract value from JSON (dot-path, e.g. data.value or result.0.value)
+# - as_of_path: optional, path to extract date from JSON (ISO format, e.g. 2025-03-18)
+# - unit/source: for display and traceability only
+
+indicators:
+  bofa_fms_cash_level:
+    url: "https://your-api.example.com/bofa/fms_cash"
+    method: "GET"
+    headers:
+      Authorization: "Bearer YOUR_TOKEN"
+    params: {}
+    value_path: "data.value"
+    as_of_path: "data.as_of"
+    unit: "%"
+    source: "your_api"

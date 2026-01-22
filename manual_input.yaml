@@ -1,0 +1,47 @@
+# Manual input for proprietary indicators (parts without public API)
+# key must be indicator ID (see below), value recommended as dict: value/unit/as_of/source/meta
+
+bofa_fms_cash_level:
+  value: 4.8
+  unit: "%"
+  as_of: "2025-03-18"
+  source: "BofA FMS"
+
+global_growth_expectations:
+  value: 2
+  unit: "%"
+  as_of: "2025-02-01"
+  source: "BofA FMS"
+
+global_equity_allocation:
+  value: 35
+  unit: "%"
+  as_of: "2025-02-01"
+  source: "BofA FMS"
+
+bofa_bull_bear:
+  value: 5.2
+  unit: "0-10"
+  as_of: "2025-03-01"
+  source: "BofA"
+
+global_equity_fund_flows:
+  value: -0.8
+  unit: "%AUM"
+  as_of: "2025-03-21"
+  source: "EPFR/Refinitiv/其他"
+
+bofa_global_breadth:
+  value: 27
+  unit: "%"
+  as_of: "2025-03-21"
+  source: "BofA"
+  meta:
+    definition: "% of constituent stocks above moving average (please fill according to your criteria)"
+
+# If you don't want to configure FRED temporarily, you can manually input high-yield bond spread (bp)
+us_high_yield_spread:
+  value: 400
+  unit: "bp"
+  as_of: "2025-03-21"
+  source: "ICE BofA / FRED(BAMLH0A0HYM2)"

@@ -1,0 +1,30 @@
+[project]
+name = "trader-alerts"
+version = "0.1.0"
+description = "Six macro/positioning indicators with bull/bear alerts (CLI)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic==2.10.4",
+  "pydantic-settings==2.7.1",
+  "PyYAML==6.0.2",
+  "requests==2.32.3",
+  "rich==13.9.4",
+  "typer==0.15.1",
+  "click==8.1.7",
+]
+
+[project.scripts]
+trader = "trader_alerts.cli:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+

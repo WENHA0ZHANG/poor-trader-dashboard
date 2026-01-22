@@ -1,0 +1,40 @@
+#!/bin/bash
+
+# Poor Trader Dashboard App
+# This script is executed when double-clicking the .app bundle
+
+# Get the project directory (same level as the .app bundle)
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../../.." && pwd)"
+
+echo "🚀 Poor Trader Dashboard"
+echo "========================"
+
+# Check if project directory exists
+if [ ! -d "$PROJECT_DIR" ]; then
+    echo "❌ Error: Project directory not found"
+    echo "Expected: $PROJECT_DIR"
+    osascript -e 'display dialog "Error: Project directory not found. Please ensure the app bundle is in the correct location." buttons {"OK"} default button "OK"'
+    exit 1
+fi
+
+echo "📂 Project directory: $PROJECT_DIR"
+
+# Check for Python
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Python 3 not found"
+    osascript -e 'display dialog "Python 3 is required but not found. Please install Python 3.8 or higher from https://python.org" buttons {"OK"} default button "OK"'
+    exit 1
+fi
+
+echo "🐍 Python found: $(python3 --version)"
+
+# Change to project directory
+cd "$PROJECT_DIR"
+
+# Run the dashboard launcher
+echo "🌐 Starting dashboard..."
+python3 run_dashboard.py
+
+echo ""
+echo "Dashboard stopped. Press any key to close..."
+read -n 1
