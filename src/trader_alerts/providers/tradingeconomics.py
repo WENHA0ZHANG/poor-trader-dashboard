@@ -77,19 +77,22 @@ class TradingEconomicsProvider(Provider):
             raise RuntimeError("无法从 TradingEconomics 页面解析当前 OAS 数值（%）")
 
         # 尝试从页面里的 TELastUpdate=YYYYMMDD... 推导日期
+        # 页面里可能有多个 TELastUpdate，取最新的一条
         as_of = date.today()
-        tm = re.search(r"TELastUpdate\s*=\s*'(\d{8})\d{6}'", html)
-        if tm:
+        update_dates: list[date] = []
+        for ymd in re.findall(r"TELastUpdate\s*=\s*'(\d{8})\d{0,6}'", html):
             try:
-                as_of = datetime.strptime(tm.group(1), "%Y%m%d").date()
+                update_dates.append(datetime.strptime(ymd, "%Y%m%d").date())
             except Exception:
-                pass
-
-        # 用户指定的最新数据日期：2025-12-23 (对应2.83%的值)
-        # 如果抓取到的日期不是最新日期，强制使用用户指定的日期
-        latest_known_date = date(2025, 12, 23)
-        if as_of < latest_known_date:
-            as_of = latest_known_date
+                continue
+        if not update_dates:
+            for ymd in re.findall(r"\bLastUpdate\s*=\s*'(\d{8})\d{0,6}'", html):
+                try:
+                    update_dates.append(datetime.strptime(ymd, "%Y%m%d").date())
+                except Exception:
+                    continue
+        if update_dates:
+            as_of = max(update_dates)
 
         return Observation(
             indicator_id=IndicatorId.US_HIGH_YIELD_SPREAD,
