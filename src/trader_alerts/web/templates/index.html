@@ -185,7 +185,7 @@
               {% endfor %}
               {% if (market_rows is none) or (market_rows|length == 0) %}
               <tr id="market-loading-row">
-                <td colspan="7" class="meta">Loading…（这块会在页面打开后异步加载，不再阻塞整页）</td>
+                <td colspan="7" class="meta">Loading... (this section loads asynchronously after page load)</td>
               </tr>
               {% endif %}
             </tbody>
@@ -283,14 +283,14 @@
           if (!tbody) return;
           const loading = document.getElementById("market-loading-row");
           if (loading) loading.remove();
-          // 清空旧行（如果之前有服务器渲染/旧缓存）
+          // Clear old rows (server-rendered or cached)
           tbody.innerHTML = "";
           if (!rows || rows.length === 0) {
             const tr = document.createElement("tr");
             const td = document.createElement("td");
             td.colSpan = 7;
             td.className = "meta";
-            td.textContent = "No data (stooq 可能网络不稳定；你可以稍后再试或刷新页面)";
+            td.textContent = "No data (stooq may be unstable; please try again later or refresh the page)";
             tr.appendChild(td);
             tbody.appendChild(tr);
             return;
