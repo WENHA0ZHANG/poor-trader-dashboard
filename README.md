@@ -2,6 +2,10 @@
 
 A local, real-time dashboard for tracking macro and sentiment indicators used in market analysis. It stores data in SQLite, supports a CLI for fetching/evaluating signals, and serves a FastAPI web UI for quick review.
 
+## Live Demo
+
+Access the hosted dashboard here: https://poor-trader-dashboard.onrender.com
+
 ## Features
 
 - US High Yield OAS, AAII Bull-Bear Spread, CNN Fear & Greed, Put/Call Ratio, S&P 500 PE, Nasdaq 100 PE, RSI, VIX
