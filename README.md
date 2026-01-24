@@ -2,6 +2,22 @@
 
 A local, real-time dashboard for tracking macro and sentiment indicators used in market analysis. It stores data in SQLite, supports a CLI for fetching/evaluating signals, and serves a FastAPI web UI for quick review.
 
+## What This Dashboard Does
+
+This dashboard scrapes free, public market data and turns it into a compact decision panel for trading. A **Top** signal is treated as a **sell** point, and a **Bottom** signal is treated as a **buy** point.
+
+### The 9 Indicators and What They Represent
+
+- US High Yield Option-Adjusted Spread: credit stress and risk appetite in high-yield bonds
+- Investor Sentiment Bull-Bear Spread: retail sentiment extremes (bulls minus bears)
+- Fear & Greed Index: composite risk sentiment gauge
+- Put/Call Ratio (5-Day Average): options positioning and hedging pressure
+- S&P 500 Price-to-Earnings Ratio: broad market valuation
+- Nasdaq 100 Price-to-Earnings Ratio: growth/tech valuation
+- S&P 500 Relative Strength Index (RSI): momentum and overbought/oversold conditions
+- Nasdaq 100 Stocks Above 20-Day Moving Average: short-term breadth and trend strength
+- S&P 500 Volatility Index (VIX): implied volatility and risk aversion
+
 ## Live Demo
 
 Access the hosted dashboard here: https://poor-trader-dashboard.onrender.com
@@ -13,27 +29,6 @@ Access the hosted dashboard here: https://poor-trader-dashboard.onrender.com
 - Bull/bear alerts based on historical thresholds
 - Local SQLite storage for reproducible views
 - CLI utilities for fetch, show, and evaluate
-
-## Purpose
-
-This dashboard crawls free, public market data sources to support trading decisions. The signal logic is simple:
-
-- Many **Top** signals = potential sell zone
-- Many **Bottom** signals = potential buy zone
-
-These are heuristic indicators for market sentiment and valuation; they are not financial advice.
-
-## Indicators (What They Represent)
-
-- **US High Yield Option-Adjusted Spread (OAS)**: credit stress/risk appetite in junk bonds (wider spread = risk-off).
-- **AAII Bull-Bear Spread**: retail investor sentiment extremes.
-- **CNN Fear & Greed Index**: composite sentiment gauge from multiple market inputs.
-- **Put/Call Ratio (5-day avg)**: options positioning; higher = fear/hedging, lower = complacency.
-- **S&P 500 P/E**: valuation level for the broad market.
-- **Nasdaq 100 P/E**: valuation level for large-cap growth/tech.
-- **S&P 500 RSI**: short-term momentum/overbought-oversold.
-- **Nasdaq 100 Above 20D MA (%)**: market breadth; how many stocks are above short-term trend.
-- **VIX**: implied volatility; market stress/uncertainty.
 
 ## Quick Start (one-click)
 
