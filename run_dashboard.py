@@ -120,14 +120,29 @@ def activate_and_run(project_root, python_exe, venv_path):
 
         # Check if trader command exists
         print("🔧 Checking application installation...")
+        installed = False
         try:
             trader_cmd = [python_exe, "-c", "import trader_alerts.cli"]
             result = subprocess.run(trader_cmd, capture_output=True, text=True, timeout=10)
             if result.returncode != 0:
                 print("⚠️  Installing application...")
-                install_cmd = [python_exe, "-m", "pip", "install", "-e", "src/"]
-                subprocess.run(install_cmd, check=True, timeout=60)
-                print("✅ Application installation completed")
+                root_pyproject = Path(project_root) / "pyproject.toml"
+                root_setup = Path(project_root) / "setup.py"
+                src_pyproject = Path(project_root) / "src" / "pyproject.toml"
+                src_setup = Path(project_root) / "src" / "setup.py"
+
+                if root_pyproject.exists() or root_setup.exists():
+                    install_cmd = [python_exe, "-m", "pip", "install", "-e", "."]
+                elif src_pyproject.exists() or src_setup.exists():
+                    install_cmd = [python_exe, "-m", "pip", "install", "-e", "src/"]
+                else:
+                    install_cmd = None
+                    print("⚠️  No pyproject.toml or setup.py found, skipping install")
+
+                if install_cmd:
+                    subprocess.run(install_cmd, check=True, timeout=60)
+                    installed = True
+                    print("✅ Application installation completed")
         except subprocess.TimeoutExpired:
             print("⚠️  Installation timeout, continuing startup...")
         except Exception as e:
@@ -148,7 +163,11 @@ def activate_and_run(project_root, python_exe, venv_path):
         print("")
 
         # Wait for service to start
-        process = subprocess.Popen(cmd)
+        env = os.environ.copy()
+        if not installed:
+            src_path = str(Path(project_root) / "src")
+            env["PYTHONPATH"] = f"{src_path}{os.pathsep}{env.get('PYTHONPATH', '')}"
+        process = subprocess.Popen(cmd, env=env)
 
         # Wait for service startup
         time.sleep(3)
