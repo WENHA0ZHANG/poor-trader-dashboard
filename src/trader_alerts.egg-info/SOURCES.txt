@@ -1,3 +1,4 @@
+LICENSE
 README.md
 pyproject.toml
 src/trader_alerts/__init__.py
@@ -22,12 +23,16 @@ src/trader_alerts/providers/base.py
 src/trader_alerts/providers/cnn.py
 src/trader_alerts/providers/fred.py
 src/trader_alerts/providers/http_json.py
+src/trader_alerts/providers/macromicro.py
 src/trader_alerts/providers/manual.py
 src/trader_alerts/providers/multpl.py
+src/trader_alerts/providers/nasdaq100_breadth.py
 src/trader_alerts/providers/nasdaq_pe.py
 src/trader_alerts/providers/ndtw.py
 src/trader_alerts/providers/sp500_rsi.py
+src/trader_alerts/providers/streetstats.py
 src/trader_alerts/providers/tradingeconomics.py
+src/trader_alerts/providers/tradingview_ws.py
 src/trader_alerts/providers/vix.py
 src/trader_alerts/providers/ycharts.py
 src/trader_alerts/web/__init__.py
