@@ -470,6 +470,8 @@ def create_app(
                 unit_display = ""
             elif unit_display == "index":
                 unit_display = ""
+            elif unit_display == "ratio":
+                unit_display = ""
             series.append({"date": o.as_of.isoformat(), "value": v})
 
         th = thresholds.get(ind) or {}
