@@ -15,7 +15,7 @@ This dashboard scrapes free, public market data and turns it into a compact deci
 - S&P 500 Price-to-Earnings Ratio: broad market valuation
 - Nasdaq 100 Price-to-Earnings Ratio: growth/tech valuation
 - S&P 500 Relative Strength Index (RSI): momentum and overbought/oversold conditions
-- Nasdaq 100 Stocks Above 20-Day Moving Average: short-term breadth and trend strength
+- Nasdaq 100 Above 20-Day Moving Average: short-term breadth and trend strength
 - S&P 500 Volatility Index (VIX): implied volatility and risk aversion
 
 ## Live Demo

@@ -54,6 +54,39 @@
         color: rgba(255,255,255,0.88);
         border-bottom: 1px solid var(--border);
       }
+      .indicator-chart {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+      }
+      .indicator-chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+      .indicator-chart-controls {
+        display: inline-flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+      .indicator-chart-controls button {
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.06);
+        color: var(--text);
+        padding: 4px 8px;
+        border-radius: 8px;
+        font-size: 11px;
+        cursor: pointer;
+      }
+      .indicator-chart-controls button.active {
+        background: rgba(138, 162, 255, 0.18);
+        border-color: rgba(138, 162, 255, 0.45);
+      }
+      .indicator-chart-title { font-size: 12px; font-weight: 600; }
+      .indicator-chart-canvas { height: 180px; position: relative; }
+      .indicator-row { cursor: pointer; }
+      .indicator-row.active td { background: rgba(138, 162, 255, 0.14); }
       table { width: 100%; border-collapse: collapse; }
       th, td {
         padding: 10px 12px;
@@ -134,7 +167,26 @@
         </div>
 
         <div class="card">
-          <h2>Latest Indicator Values</h2>
+          <h2>Indicator Trends & Latest Values</h2>
+          <div class="indicator-chart">
+            <div class="indicator-chart-header">
+              <div>
+                <div class="indicator-chart-title" id="indicator-chart-title">Indicator History</div>
+                <div class="meta" id="indicator-chart-meta">Click a row below to load history from the database.</div>
+              </div>
+              <div class="indicator-chart-controls" id="indicator-chart-controls">
+                <button data-days="7">1W</button>
+                <button data-days="30">1M</button>
+                <button data-days="180">6M</button>
+                <button data-days="365">1Y</button>
+                <button data-days="36500">All</button>
+              </div>
+            </div>
+            <div class="indicator-chart-canvas">
+              <canvas id="indicator-chart"></canvas>
+            </div>
+            <div class="empty" id="indicator-chart-empty">Select an indicator row to view its trend.</div>
+          </div>
           <table>
             <thead>
               <tr>
@@ -146,7 +198,7 @@
             </thead>
             <tbody>
               {% for r in latest_rows %}
-              <tr style="{% if r.is_top %}background-color: rgba(255, 93, 143, 0.08); border-left: 3px solid var(--bear);{% elif r.is_bottom %}background-color: rgba(46, 229, 157, 0.08); border-left: 3px solid var(--bull);{% else %}background-color: rgba(255, 255, 255, 0.02); border-left: 3px solid var(--neutral);{% endif %}">
+              <tr class="indicator-row" data-indicator-id="{{ r.id }}" data-indicator-name="{{ r.name }}" style="{% if r.is_top %}background-color: rgba(255, 93, 143, 0.08); border-left: 3px solid var(--bear);{% elif r.is_bottom %}background-color: rgba(46, 229, 157, 0.08); border-left: 3px solid var(--bull);{% else %}background-color: rgba(255, 255, 255, 0.02); border-left: 3px solid var(--neutral);{% endif %}">
                 <td>{{ r.name }}</td>
                 <td>{{ r.as_of or "—" }}</td>
                 <td style="{% if r.is_top %}color: var(--bear); font-weight: 600;{% elif r.is_bottom %}color: var(--bull); font-weight: 600;{% else %}color: var(--muted);{% endif %}">{{ r.value if r.value is not none else "—" }}</td>
@@ -265,7 +317,175 @@
                 });
         }
         </script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
         <script>
+        let indicatorChart = null;
+        let currentIndicatorId = null;
+        let currentIndicatorName = null;
+        let currentRangeDays = 365;
+
+        function _formatChartValue(value, unit) {
+          if (value === null || value === undefined) return "—";
+          const n = Number(value);
+          if (Number.isNaN(n)) return "—";
+          const formatted = n.toFixed(2);
+          if (!unit) return formatted;
+          return unit === "%" ? `${formatted}%` : `${formatted} ${unit}`;
+        }
+
+        function _parseDateLabel(label) {
+          if (!label) return null;
+          const parts = String(label).split("-");
+          if (parts.length < 3) return null;
+          return { y: parts[0], m: parts[1], d: parts[2] };
+        }
+
+        function _formatDateLabel(label, prevLabel) {
+          const curr = _parseDateLabel(label);
+          if (!curr) return label || "";
+          const prev = _parseDateLabel(prevLabel);
+          const showYear = !prev || prev.y !== curr.y;
+          return showYear ? `${curr.y}-${curr.m}-${curr.d}` : `${curr.m}-${curr.d}`;
+        }
+
+        function _getTickIndexes(total) {
+          if (total <= 5) {
+            return new Set(Array.from({ length: total }, (_, i) => i));
+          }
+          const idx = new Set();
+          for (let i = 0; i < 5; i += 1) {
+            idx.add(Math.round(i * (total - 1) / 4));
+          }
+          return idx;
+        }
+
+        const thresholdLabelPlugin = {
+          id: "thresholdLabels",
+          afterDatasetsDraw(chart, args, opts) {
+            const { ctx, chartArea, scales } = chart;
+            if (!chartArea || !scales || !scales.y) return;
+            const yScale = scales.y;
+            const xRight = chartArea.right - 6;
+            const boxes = [];
+
+            ctx.save();
+            ctx.font = "11px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial";
+            ctx.textBaseline = "middle";
+
+            function _boxForText(x, y, text, align) {
+              const w = ctx.measureText(text).width;
+              const h = 12;
+              const x1 = align === "right" ? x - w : x;
+              return { x1, y1: y - h / 2, x2: x1 + w, y2: y + h / 2 };
+            }
+
+            function _intersects(a, b) {
+              return !(a.x2 < b.x1 || a.x1 > b.x2 || a.y2 < b.y1 || a.y1 > b.y2);
+            }
+
+            function _fits(box) {
+              return box.y1 >= chartArea.top && box.y2 <= chartArea.bottom;
+            }
+
+            function _placeLabel(text, yValue, color, alignRight = true) {
+              const yLine = yScale.getPixelForValue(yValue);
+              if (yLine < chartArea.top || yLine > chartArea.bottom) return;
+              const x = xRight;
+              const align = alignRight ? "right" : "left";
+              const aboveY = yLine - 10;
+              const belowY = yLine + 10;
+
+              let y = aboveY;
+              let box = _boxForText(x, y, text, align);
+              if (!_fits(box)) {
+                y = belowY;
+                box = _boxForText(x, y, text, align);
+              }
+
+              for (const b of boxes) {
+                if (_intersects(box, b)) {
+                  const altY = y === aboveY ? belowY : aboveY;
+                  const altBox = _boxForText(x, altY, text, align);
+                  if (_fits(altBox) && !_intersects(altBox, b)) {
+                    y = altY;
+                    box = altBox;
+                  } else {
+                    const shiftedY = altY + 12;
+                    const shiftedBox = _boxForText(x, shiftedY, text, align);
+                    if (_fits(shiftedBox) && !_intersects(shiftedBox, b)) {
+                      y = shiftedY;
+                      box = shiftedBox;
+                    }
+                  }
+                }
+              }
+
+              ctx.fillStyle = color;
+              ctx.textAlign = align;
+              ctx.fillText(text, x, y);
+              boxes.push(box);
+            }
+
+            if (opts && opts.top !== null && opts.top !== undefined && !Number.isNaN(opts.top)) {
+              _placeLabel(
+                `Top ${_formatChartValue(opts.top, opts.unit)}`,
+                opts.top,
+                "rgba(255, 93, 143, 0.95)"
+              );
+            }
+
+            if (opts && opts.bottom !== null && opts.bottom !== undefined && !Number.isNaN(opts.bottom)) {
+              _placeLabel(
+                `Bottom ${_formatChartValue(opts.bottom, opts.unit)}`,
+                opts.bottom,
+                "rgba(46, 229, 157, 0.95)"
+              );
+            }
+
+            const meta = chart.getDatasetMeta(0);
+            if (meta && meta.data && meta.data.length) {
+              const lastPoint = meta.data[meta.data.length - 1];
+              if (lastPoint && opts && opts.latest !== null && opts.latest !== undefined && !Number.isNaN(opts.latest)) {
+                let x = lastPoint.x + 6;
+                let y = lastPoint.y;
+                let align = "left";
+                if (x > chartArea.right - 70) {
+                  x = lastPoint.x - 6;
+                  align = "right";
+                }
+                let text = `Latest ${_formatChartValue(opts.latest, opts.unit)}`;
+                let box = _boxForText(x, y, text, align);
+                if (!_fits(box)) {
+                  y = lastPoint.y - 10;
+                  box = _boxForText(x, y, text, align);
+                }
+                for (const b of boxes) {
+                  if (_intersects(box, b)) {
+                    const altY = y + 12;
+                    const altBox = _boxForText(x, altY, text, align);
+                    if (_fits(altBox) && !_intersects(altBox, b)) {
+                      y = altY;
+                      box = altBox;
+                    } else {
+                      const altY2 = y - 12;
+                      const altBox2 = _boxForText(x, altY2, text, align);
+                      if (_fits(altBox2) && !_intersects(altBox2, b)) {
+                        y = altY2;
+                        box = altBox2;
+                      }
+                    }
+                  }
+                }
+                ctx.fillStyle = "rgba(138, 162, 255, 0.95)";
+                ctx.textAlign = align;
+                ctx.fillText(text, x, y);
+              }
+            }
+
+            ctx.restore();
+          },
+        };
+
         function _fmtPct(v) {
           if (v === null || v === undefined) return "—";
           const n = Number(v);
@@ -319,13 +539,234 @@
             // ignore
           }
         }
-        window.addEventListener("load", loadMarketOverview);
+        async function loadIndicatorHistory(indicatorId, indicatorName, days) {
+          const titleEl = document.getElementById("indicator-chart-title");
+          const metaEl = document.getElementById("indicator-chart-meta");
+          const emptyEl = document.getElementById("indicator-chart-empty");
+          const canvas = document.getElementById("indicator-chart");
+          if (!titleEl || !metaEl || !emptyEl || !canvas) return;
+
+          titleEl.textContent = indicatorName || indicatorId;
+          metaEl.textContent = "Loading...";
+          emptyEl.style.display = "none";
+
+          if (typeof Chart === "undefined") {
+            metaEl.textContent = "Chart library unavailable.";
+            emptyEl.style.display = "block";
+            return;
+          }
+
+          try {
+            const resp = await fetch(`/api/indicator-history?indicator_id=${encodeURIComponent(indicatorId)}&days=${days}`);
+            if (!resp.ok) {
+              metaEl.textContent = "Failed to load history.";
+              emptyEl.style.display = "block";
+              return;
+            }
+            const data = await resp.json();
+            const series = data.series || [];
+            const unit = data.unit || "";
+            const topLineValue = (data.top === null || data.top === undefined) ? null : Number(data.top);
+            const bottomLineValue = (data.bottom === null || data.bottom === undefined) ? null : Number(data.bottom);
+            if (!series.length) {
+              metaEl.textContent = "No history available.";
+              emptyEl.style.display = "block";
+              if (indicatorChart) {
+                indicatorChart.destroy();
+                indicatorChart = null;
+              }
+              return;
+            }
+
+            const labels = series.map(p => p.date);
+            const values = series.map(p => p.value);
+            const latestValue = values[values.length - 1];
+
+            const datasets = [{
+              label: unit ? `${indicatorName} (${unit})` : indicatorName,
+              data: values,
+              borderColor: "rgba(138, 162, 255, 0.9)",
+              backgroundColor: "rgba(138, 162, 255, 0.15)",
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.25,
+              fill: "start",
+            }];
+
+            if (!Number.isNaN(topLineValue) && topLineValue !== null) {
+              datasets.push({
+                label: "Top",
+                data: labels.map(() => topLineValue),
+                borderColor: "rgba(255, 93, 143, 0.9)",
+                borderDash: [6, 6],
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+              });
+            }
+
+            if (!Number.isNaN(bottomLineValue) && bottomLineValue !== null) {
+              datasets.push({
+                label: "Bottom",
+                data: labels.map(() => bottomLineValue),
+                borderColor: "rgba(46, 229, 157, 0.9)",
+                borderDash: [6, 6],
+                borderWidth: 1,
+                pointRadius: 0,
+                fill: false,
+              });
+            }
+
+            if (indicatorChart) {
+              indicatorChart.destroy();
+            }
+
+            indicatorChart = new Chart(canvas, {
+              type: "line",
+              plugins: [thresholdLabelPlugin],
+              data: {
+                labels,
+                datasets,
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  thresholdLabels: {
+                    top: topLineValue,
+                    bottom: bottomLineValue,
+                    latest: latestValue,
+                    unit,
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => _formatChartValue(ctx.parsed.y, unit),
+                    },
+                  },
+                },
+                scales: {
+                  x: {
+                    ticks: {
+                      color: "rgba(255,255,255,0.65)",
+                      autoSkip: false,
+                      maxRotation: 0,
+                      minRotation: 0,
+                      callback: function(value, index, ticks) {
+                        const shown = _getTickIndexes(ticks.length);
+                        if (!shown.has(index)) return "";
+                        const label = this.getLabelForValue(value);
+                        let prevLabel = null;
+                        for (let i = index - 1; i >= 0; i -= 1) {
+                          if (shown.has(i)) {
+                            prevLabel = this.getLabelForValue(ticks[i].value);
+                            break;
+                          }
+                        }
+                        return _formatDateLabel(label, prevLabel);
+                      },
+                    },
+                    grid: {
+                      color: (ctx) => {
+                        const total = ctx.scale.ticks.length;
+                        const shown = _getTickIndexes(total);
+                        return shown.has(ctx.index) ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0)";
+                      },
+                    },
+                  },
+                  y: {
+                    ticks: { color: "rgba(255,255,255,0.65)", maxTicksLimit: 5, count: 5 },
+                    grid: { color: "rgba(255,255,255,0.06)" },
+                  },
+                },
+              },
+            });
+
+            const topText = (!Number.isNaN(topLineValue) && topLineValue !== null)
+              ? `Top: ${_formatChartValue(topLineValue, unit)}`
+              : null;
+            const bottomText = (!Number.isNaN(bottomLineValue) && bottomLineValue !== null)
+              ? `Bottom: ${_formatChartValue(bottomLineValue, unit)}`
+              : null;
+            const thresholdText = [topText, bottomText].filter(Boolean).join(" | ");
+            const rangeText = days >= 36500 ? "All" : `${days}D`;
+            metaEl.textContent = thresholdText
+              ? `${series.length} points · ${rangeText} · ${thresholdText}`
+              : `${series.length} points · ${rangeText}`;
+            emptyEl.style.display = "none";
+          } catch (e) {
+            metaEl.textContent = "Failed to load history.";
+            emptyEl.style.display = "block";
+          }
+        }
+
+        function setRange(days) {
+          currentRangeDays = days;
+          const controls = document.getElementById("indicator-chart-controls");
+          if (controls) {
+            controls.querySelectorAll("button").forEach(btn => {
+              btn.classList.toggle("active", Number(btn.dataset.days) === days);
+            });
+          }
+          if (currentIndicatorId) {
+            loadIndicatorHistory(currentIndicatorId, currentIndicatorName, currentRangeDays);
+          }
+        }
+
+        function initIndicatorRanges() {
+          const controls = document.getElementById("indicator-chart-controls");
+          if (!controls) return;
+          controls.querySelectorAll("button").forEach(btn => {
+            btn.addEventListener("click", () => {
+              const days = Number(btn.dataset.days);
+              if (!Number.isNaN(days)) {
+                setRange(days);
+              }
+            });
+          });
+          setRange(currentRangeDays);
+        }
+
+        function initIndicatorChart() {
+          const rows = Array.from(document.querySelectorAll(".indicator-row"));
+          if (!rows.length) return;
+          rows.forEach(row => {
+            row.addEventListener("click", () => {
+              rows.forEach(r => r.classList.remove("active"));
+              row.classList.add("active");
+              const id = row.getAttribute("data-indicator-id");
+              const name = row.getAttribute("data-indicator-name");
+              if (id) {
+                currentIndicatorId = id;
+                currentIndicatorName = name || id;
+                loadIndicatorHistory(currentIndicatorId, currentIndicatorName, currentRangeDays);
+              }
+            });
+          });
+          rows[0].click();
+        }
+
+        window.addEventListener("load", () => {
+          loadMarketOverview();
+          initIndicatorRanges();
+          initIndicatorChart();
+        });
         </script>
         <div style="margin-top:6px;">
           Indicator Sources:
           {% for s in sources %}
             <a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.name }}</a>{% if not loop.last %} / {% endif %}
           {% endfor %}
+        </div>
+        <div style="margin-top:8px;">
+          For collaboration or questions, please reach out via the project GitHub:
+          <a href="https://github.com/WENHA0ZHANG/poor-trader-dashboard" target="_blank" rel="noopener">
+            https://github.com/WENHA0ZHANG/poor-trader-dashboard
+          </a>
+          · Personal site:
+          <a href="https://wenha0zhang.github.io/" target="_blank" rel="noopener">
+            https://wenha0zhang.github.io/
+          </a>
         </div>
       </div>
     </div>
