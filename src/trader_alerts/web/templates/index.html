@@ -167,44 +167,6 @@
       </div>
 
       <div class="grid">
-        <div class="card" style="grid-column: span 2;">
-          <h2>Bull/Bear Alerts: Top Signals / Bottom Signals (Simplified Rules Based on Historical Thresholds)</h2>
-          <div style="display:flex; gap:12px; padding: 12px 14px; flex-wrap: wrap;">
-            <div>
-              <span class="pill bear">Top Signals</span>
-              <span class="meta">Count: <code>{{ top_score }}</code></span>
-            </div>
-            <div>
-              <span class="pill bull">Bottom Signals</span>
-              <span class="meta">Count: <code>{{ bottom_score }}</code></span>
-            </div>
-          </div>
-
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 6%; text-align: center;">No.</th>
-                <th style="width: 35%">Indicator</th>
-                <th style="width: 12%">Top</th>
-                <th style="width: 12%">Bottom</th>
-                <th style="width: 35%">Rule Description</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for s in signals %}
-              <tr>
-                <td style="text-align: center;">{{ loop.index }}</td>
-                <td>{{ s.title }}</td>
-                <td>{% if s.top %}<span class="pill bear">Top</span>{% else %}<span class="pill neutral">—</span>{% endif %}</td>
-                <td>{% if s.bottom %}<span class="pill bull">Bottom</span>{% else %}<span class="pill neutral">—</span>{% endif %}</td>
-                <td class="meta">{{ s.detail }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-          <div class="empty">Note: Signals are "early warning/emotional and credit temperature gauges", not trading orders; please combine with position management and risk control.</div>
-        </div>
-
         <div class="card">
           <h2>Indicator Trends & Latest Values</h2>
           <div class="indicator-chart">
@@ -323,6 +285,44 @@
               </tbody>
             </table>
           </div>
+        </div>
+
+        <div class="card" style="grid-column: span 2;">
+          <h2>Bull/Bear Alerts: Top Signals / Bottom Signals (Simplified Rules Based on Historical Thresholds)</h2>
+          <div style="display:flex; gap:12px; padding: 12px 14px; flex-wrap: wrap;">
+            <div>
+              <span class="pill bear">Top Signals</span>
+              <span class="meta">Count: <code>{{ top_score }}</code></span>
+            </div>
+            <div>
+              <span class="pill bull">Bottom Signals</span>
+              <span class="meta">Count: <code>{{ bottom_score }}</code></span>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 6%; text-align: center;">No.</th>
+                <th style="width: 35%">Indicator</th>
+                <th style="width: 12%">Top</th>
+                <th style="width: 12%">Bottom</th>
+                <th style="width: 35%">Rule Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in signals %}
+              <tr>
+                <td style="text-align: center;">{{ loop.index }}</td>
+                <td>{{ s.title }}</td>
+                <td>{% if s.top %}<span class="pill bear">Top</span>{% else %}<span class="pill neutral">—</span>{% endif %}</td>
+                <td>{% if s.bottom %}<span class="pill bull">Bottom</span>{% else %}<span class="pill neutral">—</span>{% endif %}</td>
+                <td class="meta">{{ s.detail }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <div class="empty">Note: Signals are "early warning/emotional and credit temperature gauges", not trading orders; please combine with position management and risk control.</div>
         </div>
       </div>
 
