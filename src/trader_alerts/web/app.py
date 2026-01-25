@@ -28,7 +28,7 @@ from ..providers import (
 from ..constants import IndicatorId
 from ..signals import compute_signals
 from ..service import compute_alerts
-from ..storage import list_latest, upsert_observations, get_last_update_time
+from ..storage import list_latest, upsert_observations, get_last_update_time, recent_observations
 from ..market import get_us_index_overview_rows
 
 
@@ -212,7 +212,7 @@ def create_app(
             IndicatorId.SP500_PE_RATIO: "S&P 500 Price-to-Earnings Ratio",
             IndicatorId.NASDAQ100_PE_RATIO: "Nasdaq 100 Price-to-Earnings Ratio",
             IndicatorId.SP500_RSI: "S&P 500 Relative Strength Index",
-            IndicatorId.NASDAQ100_ABOVE_20D_MA: "Nasdaq 100 Stocks Above 20-Day Moving Average (%)",
+            IndicatorId.NASDAQ100_ABOVE_20D_MA: "Nasdaq 100 Above 20-Day Moving Average (%)",
             IndicatorId.VIX: "S&P 500 Volatility Index",
         }
 
@@ -345,6 +345,53 @@ def create_app(
     def api_alerts() -> Any:
         alerts = compute_alerts(resolved_db, list(ALL_INDICATORS))
         return [asdict(a) for a in alerts]
+
+    @app.get("/api/indicator-history")
+    def api_indicator_history(indicator_id: str, days: int = 3650) -> dict[str, Any]:
+        try:
+            ind = IndicatorId(indicator_id)
+        except Exception:
+            return {"indicator_id": indicator_id, "unit": None, "series": [], "error": "Unknown indicator_id"}
+
+        thresholds: dict[IndicatorId, dict[str, float]] = {
+            IndicatorId.BOFA_BULL_BEAR: {"top": 20.0, "bottom": -20.0},
+            IndicatorId.CNN_FEAR_GREED_INDEX: {"top": 75.0, "bottom": 25.0},
+            IndicatorId.CNN_PUT_CALL_OPTIONS: {"top": 0.6, "bottom": 0.8},
+            IndicatorId.VIX: {"top": 14.0, "bottom": 25.0},
+            IndicatorId.SP500_RSI: {"top": 70.0, "bottom": 30.0},
+            IndicatorId.SP500_PE_RATIO: {"top": 32.0, "bottom": 22.0},
+            IndicatorId.NASDAQ100_PE_RATIO: {"top": 35.0, "bottom": 28.0},
+            IndicatorId.NASDAQ100_ABOVE_20D_MA: {"top": 80.0, "bottom": 20.0},
+            IndicatorId.US_HIGH_YIELD_SPREAD: {"top": 2.8, "bottom": 4.5},
+        }
+
+        days = max(1, min(int(days), 36500))
+        obs = recent_observations(resolved_db, ind, days)
+        series: list[dict[str, Any]] = []
+        unit_display: str | None = None
+
+        for o in obs:
+            v = float(o.value)
+            unit_display = o.unit
+            if ind == IndicatorId.US_HIGH_YIELD_SPREAD and unit_display == "bp":
+                v = v / 100.0
+                unit_display = "%"
+            elif unit_display == "percent":
+                unit_display = "%"
+            elif unit_display == "0-100":
+                unit_display = ""
+            elif unit_display == "index":
+                unit_display = ""
+            series.append({"date": o.as_of.isoformat(), "value": v})
+
+        th = thresholds.get(ind) or {}
+        return {
+            "indicator_id": ind.value,
+            "unit": unit_display,
+            "series": series,
+            "top": th.get("top"),
+            "bottom": th.get("bottom"),
+        }
 
     # Store auto_fetch state for toggling (simplified approach)
     app.state.auto_fetch_enabled = auto_fetch

@@ -40,7 +40,7 @@ ALL_INDICATORS: tuple[IndicatorId, ...] = (
     IndicatorId.SP500_RSI,                        # S&P 500 Relative Strength Index
     IndicatorId.SP500_PE_RATIO,                   # S&P 500 Price-to-Earnings Ratio
     IndicatorId.NASDAQ100_PE_RATIO,               # Nasdaq 100 Price-to-Earnings Ratio
-    IndicatorId.NASDAQ100_ABOVE_20D_MA,           # Nasdaq 100 Stocks Above 20-Day Moving Average (%)
+    IndicatorId.NASDAQ100_ABOVE_20D_MA,           # Nasdaq 100 Above 20-Day Moving Average (%)
     IndicatorId.US_HIGH_YIELD_SPREAD,             # US High Yield Option-Adjusted Spread
 )
 

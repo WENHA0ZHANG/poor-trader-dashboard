@@ -156,7 +156,7 @@ def compute_signals(
                 indicator_id=IndicatorId.NASDAQ100_ABOVE_20D_MA,
                 top=top,
                 bottom=bottom,
-                title="Nasdaq 100 Stocks Above 20-Day Moving Average (%)",
+                title="Nasdaq 100 Above 20-Day Moving Average (%)",
                 detail=f"{v:.2f}% (>80 top; <20 bottom)",
             )
         )
