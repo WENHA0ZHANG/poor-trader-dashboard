@@ -54,6 +54,10 @@
         color: rgba(255,255,255,0.88);
         border-bottom: 1px solid var(--border);
       }
+      .market-stack { display: flex; flex-direction: column; gap: 10px; }
+      .mini-card h2 { padding: 10px 12px 8px; font-size: 12px; }
+      .mini-card th, .mini-card td { padding: 6px 10px; font-size: 11px; }
+      .mini-card .empty { padding: 8px 12px; font-size: 11px; }
       .indicator-chart {
         padding: 12px 14px;
         border-bottom: 1px solid var(--border);
@@ -87,6 +91,41 @@
       .indicator-chart-canvas { height: 180px; position: relative; }
       .indicator-row { cursor: pointer; }
       .indicator-row.active td { background: rgba(138, 162, 255, 0.14); }
+      .stock-controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 8px 12px 10px;
+        border-bottom: 1px solid var(--border);
+      }
+      .stock-controls input {
+        flex: 1 1 160px;
+        min-width: 140px;
+        background: rgba(255,255,255,0.06);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 6px 8px;
+        border-radius: 8px;
+        font-size: 12px;
+      }
+      .stock-controls button {
+        border: 1px solid var(--border);
+        background: rgba(255,255,255,0.06);
+        color: var(--text);
+        padding: 6px 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      .stock-remove-btn {
+        border: none;
+        background: transparent;
+        color: rgba(255,255,255,0.55);
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+      }
+      .stock-remove-btn:hover { color: rgba(255,255,255,0.9); }
       table { width: 100%; border-collapse: collapse; }
       th, td {
         padding: 10px 12px;
@@ -209,39 +248,81 @@
           </table>
         </div>
 
-        <div class="card">
-          <h2>US Market Overview (Real-time): Major Indices & Key Stocks</h2>
-          <table>
-            <thead>
-              <tr>
-                <th style="width: 18%">Name</th>
-                <th style="width: 18%">Date</th>
-                <th style="width: 18%">Latest</th>
-                <th style="width: 11.5%">1W</th>
-                <th style="width: 11.5%">1M</th>
-                <th style="width: 11.5%">3M</th>
-                <th style="width: 11.5%">1Y</th>
-              </tr>
-            </thead>
-            <tbody id="market-body">
-              {% for r in market_rows %}
-              <tr>
-                <td>{{ r.name }}</td>
-                <td>{{ r.as_of }}</td>
-                <td style="font-weight:700;">{{ r.close|round(2) }}</td>
-                <td style="{% if r.chg_1w_pct is not none %}{% if r.chg_1w_pct >= 0 %}color: var(--bull);{% else %}color: var(--bear);{% endif %}font-weight: 600;{% endif %}">{{ (r.chg_1w_pct|round(2) ~ "%") if r.chg_1w_pct is not none else "—" }}</td>
-                <td style="{% if r.chg_1m_pct is not none %}{% if r.chg_1m_pct >= 0 %}color: var(--bull);{% else %}color: var(--bear);{% endif %}font-weight: 600;{% endif %}">{{ (r.chg_1m_pct|round(2) ~ "%") if r.chg_1m_pct is not none else "—" }}</td>
-                <td style="{% if r.chg_3m_pct is not none %}{% if r.chg_3m_pct >= 0 %}color: var(--bull);{% else %}color: var(--bear);{% endif %}font-weight: 600;{% endif %}">{{ (r.chg_3m_pct|round(2) ~ "%") if r.chg_3m_pct is not none else "—" }}</td>
-                <td style="{% if r.chg_1y_pct is not none %}{% if r.chg_1y_pct >= 0 %}color: var(--bull);{% else %}color: var(--bear);{% endif %}font-weight: 600;{% endif %}">{{ (r.chg_1y_pct|round(2) ~ "%") if r.chg_1y_pct is not none else "—" }}</td>
-              </tr>
-              {% endfor %}
-              {% if (market_rows is none) or (market_rows|length == 0) %}
-              <tr id="market-loading-row">
-                <td colspan="7" class="meta">Loading... (this section loads asynchronously after page load)</td>
-              </tr>
-              {% endif %}
-            </tbody>
-          </table>
+        <div class="market-stack">
+          <div class="card mini-card">
+            <h2>US Market Indices <a href="#" onclick="loadMarketOverview(); return false;" style="color: rgba(255,255,255,0.8); font-weight: 500;">Update</a></h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 18%">Name</th>
+                  <th style="width: 18%">Date</th>
+                  <th style="width: 18%">Latest</th>
+                  <th style="width: 11.5%">1W</th>
+                  <th style="width: 11.5%">1M</th>
+                  <th style="width: 11.5%">3M</th>
+                  <th style="width: 11.5%">1Y</th>
+                </tr>
+              </thead>
+              <tbody id="market-body-indices">
+                {% if (market_rows is none) or (market_rows|length == 0) %}
+                <tr id="market-loading-row-indices">
+                  <td colspan="7" class="meta">Loading... (this section loads asynchronously after page load)</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card mini-card">
+            <h2>Futures & Crypto <a href="#" onclick="loadMarketOverview(); return false;" style="color: rgba(255,255,255,0.8); font-weight: 500;">Update</a></h2>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 18%">Name</th>
+                  <th style="width: 18%">Date</th>
+                  <th style="width: 18%">Latest</th>
+                  <th style="width: 11.5%">1W</th>
+                  <th style="width: 11.5%">1M</th>
+                  <th style="width: 11.5%">3M</th>
+                  <th style="width: 11.5%">1Y</th>
+                </tr>
+              </thead>
+              <tbody id="market-body-assets">
+                {% if (market_rows is none) or (market_rows|length == 0) %}
+                <tr id="market-loading-row-assets">
+                  <td colspan="7" class="meta">Loading... (this section loads asynchronously after page load)</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
+          <div class="card mini-card">
+            <h2>Stocks <a href="#" onclick="loadMarketOverview(); return false;" style="color: rgba(255,255,255,0.8); font-weight: 500;">Update</a></h2>
+            <div class="stock-controls">
+              <input id="stock-search-input" type="text" placeholder="Search/add ticker (e.g., AAPL)" />
+              <button id="stock-add-btn" type="button">Add</button>
+            </div>
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 18%">Name</th>
+                  <th style="width: 18%">Date</th>
+                  <th style="width: 18%">Latest</th>
+                  <th style="width: 11.5%">1W</th>
+                  <th style="width: 11.5%">1M</th>
+                  <th style="width: 11.5%">3M</th>
+                  <th style="width: 11.5%">1Y</th>
+                  <th style="width: 4%"></th>
+                </tr>
+              </thead>
+              <tbody id="market-body-stocks">
+                {% if (market_rows is none) or (market_rows|length == 0) %}
+                <tr id="market-loading-row-stocks">
+                  <td colspan="8" class="meta">Loading... (this section loads asynchronously after page load)</td>
+                </tr>
+                {% endif %}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -498,17 +579,15 @@
           if (Number.isNaN(n)) return "";
           return (n >= 0 ? "color: var(--bull);" : "color: var(--bear);") + "font-weight: 600;";
         }
-        function renderMarketRows(rows) {
-          const tbody = document.getElementById("market-body");
+        function _renderMarketTable(tbody, rows, opts = {}) {
           if (!tbody) return;
-          const loading = document.getElementById("market-loading-row");
+          const loading = tbody.querySelector("tr[id^='market-loading-row']");
           if (loading) loading.remove();
-          // Clear old rows (server-rendered or cached)
           tbody.innerHTML = "";
           if (!rows || rows.length === 0) {
             const tr = document.createElement("tr");
             const td = document.createElement("td");
-            td.colSpan = 7;
+            td.colSpan = opts.withDelete ? 8 : 7;
             td.className = "meta";
             td.textContent = "No data (stooq may be unstable; please try again later or refresh the page)";
             tr.appendChild(td);
@@ -526,17 +605,183 @@
               <td style="${_pctStyle(r.chg_3m_pct)}">${_fmtPct(r.chg_3m_pct)}</td>
               <td style="${_pctStyle(r.chg_1y_pct)}">${_fmtPct(r.chg_1y_pct)}</td>
             `;
+            if (opts.withDelete) {
+              const td = document.createElement("td");
+              td.style.textAlign = "right";
+              const btn = document.createElement("button");
+              btn.className = "stock-remove-btn";
+              btn.type = "button";
+              btn.textContent = "×";
+              btn.addEventListener("click", () => {
+                const sym = normalizeTicker(r.symbol || r.name || "");
+                if (!sym) return;
+                const custom = new Set(getCustomStocks());
+                if (custom.has(sym)) {
+                  custom.delete(sym);
+                  saveCustomStocks(Array.from(custom));
+                } else {
+                  const hidden = new Set(getHiddenStocks());
+                  hidden.add(sym);
+                  saveHiddenStocks(Array.from(hidden));
+                }
+                loadMarketOverview();
+              });
+              td.appendChild(btn);
+              tr.appendChild(td);
+            }
             tbody.appendChild(tr);
           }
         }
+
+        function renderMarketRows(rows) {
+          const tbodyIndices = document.getElementById("market-body-indices");
+          const tbodyAssets = document.getElementById("market-body-assets");
+          const tbodyStocks = document.getElementById("market-body-stocks");
+          if (!tbodyIndices || !tbodyAssets || !tbodyStocks) return;
+
+          const rowMap = new Map();
+          for (const r of rows || []) {
+            const key = String(r.symbol || "").toLowerCase();
+            if (key) rowMap.set(key, r);
+          }
+
+          const indexList = [
+            { symbol: "^spx", name: "^SPX" },
+            { symbol: "^dji", name: "^DJI" },
+            { symbol: "^ndq", name: "^NDQ" },
+          ];
+          const assetList = [
+            { symbol: "btc.v", name: "BTC" },
+            { symbol: "xauusd", name: "XAU" },
+            { symbol: "xagusd", name: "XAG" },
+          ];
+
+          const defaultStocks = ["BRK-B", "KO", "RKLB", "AMZN"];
+          const customStocks = getCustomStocks();
+          const hidden = new Set(getHiddenStocks().map(s => s.toLowerCase()));
+          const stockList = [];
+          for (const t of [...defaultStocks, ...customStocks]) {
+            const norm = normalizeTicker(t);
+            if (!norm) continue;
+            if (hidden.has(norm.toLowerCase())) continue;
+            stockList.push({ symbol: `${norm.toLowerCase()}.us`, name: norm });
+          }
+
+          const indices = indexList.map(it => rowMap.get(it.symbol) || { name: it.name, symbol: it.symbol });
+          const assets = assetList.map(it => rowMap.get(it.symbol) || { name: it.name, symbol: it.symbol });
+          const stocks = stockList.map(it => rowMap.get(it.symbol) || { name: it.name, symbol: it.symbol });
+
+          _renderMarketTable(tbodyIndices, indices);
+          _renderMarketTable(tbodyAssets, assets);
+          _renderMarketTable(tbodyStocks, stocks, { withDelete: true });
+        }
+        const STOCK_STORAGE_KEY = "market.customStocks";
+        const STOCK_HIDDEN_KEY = "market.hiddenStocks";
+        const MARKET_CACHE_KEY = "market.overview.cache";
+
+        function getCustomStocks() {
+          try {
+            const raw = localStorage.getItem(STOCK_STORAGE_KEY);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function saveCustomStocks(list) {
+          localStorage.setItem(STOCK_STORAGE_KEY, JSON.stringify(list));
+        }
+
+        function getHiddenStocks() {
+          try {
+            const raw = localStorage.getItem(STOCK_HIDDEN_KEY);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr : [];
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function saveHiddenStocks(list) {
+          localStorage.setItem(STOCK_HIDDEN_KEY, JSON.stringify(list));
+        }
+
+        function saveMarketCache(rows) {
+          try {
+            localStorage.setItem(
+              MARKET_CACHE_KEY,
+              JSON.stringify({ rows: rows || [], savedAt: new Date().toISOString() })
+            );
+          } catch (e) {
+            // ignore storage errors
+          }
+        }
+
+        function getMarketCache() {
+          try {
+            const raw = localStorage.getItem(MARKET_CACHE_KEY);
+            if (!raw) return null;
+            const parsed = JSON.parse(raw);
+            if (!parsed || !Array.isArray(parsed.rows)) return null;
+            return parsed.rows;
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function normalizeTicker(raw) {
+          let s = String(raw || "").trim().toUpperCase().replace(/\s+/g, "");
+          if (!s) return null;
+          if (s.endsWith(".US")) s = s.slice(0, -3);
+          s = s.replace(/\./g, "-");
+          if (!/^[A-Z0-9-]+$/.test(s)) return null;
+          return s;
+        }
+
+        function initStockSearch() {
+          const input = document.getElementById("stock-search-input");
+          const btn = document.getElementById("stock-add-btn");
+          if (!input || !btn) return;
+          const add = () => {
+            const norm = normalizeTicker(input.value);
+            if (!norm) return;
+            const current = new Set(getCustomStocks());
+            current.add(norm);
+            saveCustomStocks(Array.from(current).sort());
+            const hidden = new Set(getHiddenStocks());
+            hidden.delete(norm);
+            saveHiddenStocks(Array.from(hidden));
+            input.value = "";
+            loadMarketOverview();
+          };
+          btn.addEventListener("click", add);
+          input.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              add();
+            }
+          });
+        }
+
         async function loadMarketOverview() {
           try {
-            const resp = await fetch("/api/market-overview");
+            const extra = getCustomStocks();
+            const query = extra.length ? `?symbols=${encodeURIComponent(extra.join(","))}` : "";
+            const resp = await fetch(`/api/market-overview${query}`);
             if (!resp.ok) return;
             const data = await resp.json();
-            renderMarketRows(data.rows || []);
+            const rows = data.rows || [];
+            if (rows.length > 0) {
+              saveMarketCache(rows);
+              renderMarketRows(rows);
+            } else {
+              const cached = getMarketCache();
+              renderMarketRows(cached || []);
+            }
           } catch (e) {
-            // ignore
+            const cached = getMarketCache();
+            renderMarketRows(cached || []);
           }
         }
         async function loadIndicatorHistory(indicatorId, indicatorName, days) {
@@ -748,6 +993,7 @@
 
         window.addEventListener("load", () => {
           loadMarketOverview();
+          initStockSearch();
           initIndicatorRanges();
           initIndicatorChart();
         });

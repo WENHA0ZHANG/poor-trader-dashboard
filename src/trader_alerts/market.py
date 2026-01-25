@@ -96,7 +96,21 @@ def _fetch_stooq_daily_closes(
     return rows
 
 
-def get_us_index_overview_rows() -> list[dict[str, Any]]:
+def _normalize_stock_symbol(raw: str) -> tuple[str, str] | None:
+    s = (raw or "").strip().upper().replace(" ", "")
+    if not s:
+        return None
+    # Drop .US suffix if present and normalize dots to dashes
+    if s.endswith(".US"):
+        s = s[:-3]
+    s = s.replace(".", "-")
+    # Allow letters, numbers, and dashes only
+    if not all(c.isalnum() or c == "-" for c in s):
+        return None
+    return (f"{s}.US", s)
+
+
+def get_us_index_overview_rows(extra_symbols: list[str] | None = None) -> list[dict[str, Any]]:
     """
     Output dict rows for template use.
 
@@ -108,18 +122,38 @@ def get_us_index_overview_rows() -> list[dict[str, Any]]:
     session = requests.Session()
 
     # Stooq symbols: indices, stocks, bitcoin, gold, silver
-    items = [
+    index_items = [
         ("^spx", "^SPX"),
         ("^dji", "^DJI"),
         ("^ndq", "^NDQ"),
-        ("BRK-B.US", "BRK-B"),
-        ("KO.US", "KO"),
-        ("RKLB.US", "RKLB"),
-        ("AMZN.US", "AMZN"),
+    ]
+    asset_items = [
         ("BTC.V", "BTC"),
         ("XAUUSD", "XAU"),
         ("XAGUSD", "XAG"),
     ]
+    stock_items = [
+        ("BRK-B.US", "BRK-B"),
+        ("KO.US", "KO"),
+        ("RKLB.US", "RKLB"),
+        ("AMZN.US", "AMZN"),
+    ]
+
+    extra_items: list[tuple[str, str]] = []
+    for raw in extra_symbols or []:
+        norm = _normalize_stock_symbol(raw)
+        if norm:
+            extra_items.append(norm)
+
+    seen = {sym.lower() for sym, _ in (index_items + asset_items + stock_items)}
+    deduped_extra = []
+    for sym, name in extra_items:
+        if sym.lower() in seen:
+            continue
+        seen.add(sym.lower())
+        deduped_extra.append((sym, name))
+
+    items = index_items + asset_items + stock_items + deduped_extra
 
     def _fetch_one(sym: str, name: str) -> dict[str, Any] | None:
         series = _fetch_stooq_daily_closes(sym, start=start, end=end, session=session)
