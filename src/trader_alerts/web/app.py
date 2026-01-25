@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
+import re
 from pathlib import Path
 import threading
 from typing import Any
@@ -28,7 +29,14 @@ from ..providers import (
 from ..constants import IndicatorId
 from ..signals import compute_signals
 from ..service import compute_alerts
-from ..storage import list_latest, upsert_observations, get_last_update_time, recent_observations
+from ..storage import (
+    list_latest,
+    upsert_observations,
+    get_last_update_time,
+    recent_observations,
+    upsert_market_overview_rows,
+    list_market_overview_rows,
+)
 from ..market import get_us_index_overview_rows
 
 
@@ -65,6 +73,58 @@ def create_app(
     cooldown = max(0, int(min_interval_seconds))
     last_fetch_at: dict[str, datetime] = {}
     http_cfg = Path(http_config_path)
+    default_market_symbols = [
+        "^spx",
+        "^dji",
+        "^ndq",
+        "btc.v",
+        "xauusd",
+        "xagusd",
+        "brk-b.us",
+        "ko.us",
+        "rklb.us",
+        "amzn.us",
+    ]
+
+    def _normalize_stock_symbol(raw: str) -> str | None:
+        s = (raw or "").strip().upper().replace(" ", "")
+        if not s:
+            return None
+        if s.endswith(".US"):
+            s = s[:-3]
+        s = s.replace(".", "-")
+        if not all(c.isalnum() or c == "-" for c in s):
+            return None
+        return f"{s}.US"
+
+    def _merge_market_rows(expected: list[str], live_rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        live_map: dict[str, dict[str, Any]] = {}
+        for r in live_rows:
+            key = str(r.get("symbol") or "").lower()
+            if key:
+                live_map[key] = r
+
+        missing = [s for s in expected if s.lower() not in live_map]
+        if missing:
+            db_rows = list_market_overview_rows(resolved_db, symbols=missing)
+            for r in db_rows:
+                key = str(r.get("symbol") or "").lower()
+                if key and key not in live_map:
+                    live_map[key] = r
+
+        out: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for s in expected:
+            key = s.lower()
+            row = live_map.get(key)
+            if row:
+                out.append(row)
+                seen.add(key)
+        for r in live_rows:
+            key = str(r.get("symbol") or "").lower()
+            if key and key not in seen:
+                out.append(r)
+        return out
 
     def _should_fetch(name: str, now: datetime) -> bool:
         last = last_fetch_at.get(name)
@@ -144,6 +204,8 @@ def create_app(
                 with market_lock:
                     cached_market_rows = rows or []
                     cached_market_at = datetime.now(timezone.utc)
+                if rows:
+                    upsert_market_overview_rows(resolved_db, rows)
             except Exception:
                 # 保留旧数据（或空），避免失败影响页面
                 pass
@@ -316,11 +378,37 @@ def create_app(
     @app.get("/api/market-overview")
     def api_market_overview(request: Request) -> dict[str, Any]:
         force = str(request.query_params.get("refresh") or "").strip().lower() in {"1", "true", "yes", "y"}
+        raw_symbols = str(request.query_params.get("symbols") or "")
+        symbols = [s for s in re.split(r"[,\s]+", raw_symbols) if s.strip()]
         _kick_market_refresh(force=force)
         with market_lock:
             rows = list(cached_market_rows)
             at = cached_market_at
             refreshing = market_refreshing
+        if symbols:
+            rows = get_us_index_overview_rows(extra_symbols=symbols)
+            if rows:
+                upsert_market_overview_rows(resolved_db, rows)
+            expected = list(default_market_symbols)
+            for s in symbols:
+                norm = _normalize_stock_symbol(s)
+                if norm:
+                    expected.append(norm)
+            # Keep order, de-duplicate
+            seen: set[str] = set()
+            expected_unique = []
+            for s in expected:
+                key = s.lower()
+                if key in seen:
+                    continue
+                seen.add(key)
+                expected_unique.append(s)
+            rows = _merge_market_rows(expected_unique, rows)
+        else:
+            if not rows:
+                rows = list_market_overview_rows(resolved_db)
+            rows = _merge_market_rows(default_market_symbols, rows)
+
         return {
             "rows": rows,
             "as_of_utc": at.isoformat() if at else None,

@@ -37,6 +37,27 @@ def init_db(db_path: str | Path) -> None:
         )
 
 
+def init_market_overview(db_path: str | Path) -> None:
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS market_overview (
+              symbol TEXT PRIMARY KEY,
+              name TEXT NOT NULL,
+              as_of TEXT NOT NULL,
+              close REAL NOT NULL,
+              chg_1w_pct REAL,
+              chg_1m_pct REAL,
+              chg_3m_pct REAL,
+              chg_1y_pct REAL,
+              source_url TEXT,
+              updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+
 def upsert_observations(db_path: str | Path, observations: Iterable[Observation]) -> int:
     init_db(db_path)
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
@@ -71,6 +92,93 @@ def upsert_observations(db_path: str | Path, observations: Iterable[Observation]
             rows,
         )
         return cur.rowcount
+
+
+def upsert_market_overview_rows(db_path: str | Path, rows: Iterable[dict[str, Any]]) -> int:
+    init_market_overview(db_path)
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    payload = []
+    for r in rows:
+        payload.append(
+            (
+                r.get("symbol"),
+                r.get("name"),
+                r.get("as_of"),
+                float(r.get("close")) if r.get("close") is not None else None,
+                r.get("chg_1w_pct"),
+                r.get("chg_1m_pct"),
+                r.get("chg_3m_pct"),
+                r.get("chg_1y_pct"),
+                r.get("source_url"),
+                now,
+            )
+        )
+    if not payload:
+        return 0
+    with _connect(db_path) as conn:
+        cur = conn.executemany(
+            """
+            INSERT INTO market_overview
+              (symbol, name, as_of, close, chg_1w_pct, chg_1m_pct, chg_3m_pct, chg_1y_pct, source_url, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(symbol)
+            DO UPDATE SET
+              name=excluded.name,
+              as_of=excluded.as_of,
+              close=excluded.close,
+              chg_1w_pct=excluded.chg_1w_pct,
+              chg_1m_pct=excluded.chg_1m_pct,
+              chg_3m_pct=excluded.chg_3m_pct,
+              chg_1y_pct=excluded.chg_1y_pct,
+              source_url=excluded.source_url,
+              updated_at=excluded.updated_at
+            """,
+            payload,
+        )
+        return cur.rowcount
+
+
+def list_market_overview_rows(
+    db_path: str | Path,
+    symbols: list[str] | None = None,
+) -> list[dict[str, Any]]:
+    init_market_overview(db_path)
+    with _connect(db_path) as conn:
+        if symbols:
+            norm = [s.lower() for s in symbols if s]
+            placeholders = ",".join(["?"] * len(norm))
+            rows = conn.execute(
+                f"""
+                SELECT symbol, name, as_of, close, chg_1w_pct, chg_1m_pct, chg_3m_pct, chg_1y_pct, source_url
+                FROM market_overview
+                WHERE lower(symbol) IN ({placeholders})
+                """,
+                norm,
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT symbol, name, as_of, close, chg_1w_pct, chg_1m_pct, chg_3m_pct, chg_1y_pct, source_url
+                FROM market_overview
+                """
+            ).fetchall()
+
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        out.append(
+            {
+                "symbol": row[0],
+                "name": row[1],
+                "as_of": row[2],
+                "close": row[3],
+                "chg_1w_pct": row[4],
+                "chg_1m_pct": row[5],
+                "chg_3m_pct": row[6],
+                "chg_1y_pct": row[7],
+                "source_url": row[8],
+            }
+        )
+    return out
 
 
 def latest_observation(db_path: str | Path, indicator_id: IndicatorId) -> Observation | None:
