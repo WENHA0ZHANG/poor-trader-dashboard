@@ -38,14 +38,12 @@ class Sp500RsiProvider(Provider):
         return [obs] if obs else []
 
     def _fetch_best_effort(self) -> Observation | None:
-        for fn in (self._fetch_investing, self._fetch_investtech, self._fetch_tradingview):
-            try:
-                o = fn()
-                if o:
-                    return o
-            except Exception:
-                continue
-        return None
+        # Fixed source policy: RSI only from Investing.com.
+        # Do not fall back to other providers to avoid inconsistent cloud values.
+        try:
+            return self._fetch_investing()
+        except Exception:
+            return None
 
     def _get(self, url: str, *, referer: str | None = None) -> str:
         headers = {
