@@ -69,11 +69,11 @@ class Sp500RsiProvider(Provider):
             return None
 
         # 常见形式（不同站点可能会出现的 RSI(14) / Relative Strength Index (14) / RSI - Relative Strength Index）
+        # 注意：不要使用过宽的 "\bRSI\b ... number" 规则，避免误抓页面其它数字（云端更易触发反爬页面）。
         patterns = [
             r"Relative\s+Strength\s+Index\s*\(14\)[^0-9]{0,80}([0-9]{1,3}(?:\.[0-9]+)?)",
             r"RSI\s*\(14\)[^0-9]{0,80}([0-9]{1,3}(?:\.[0-9]+)?)",
             r"RSI\s*-\s*Relative\s+Strength\s+Index[^0-9]{0,120}([0-9]{1,3}(?:\.[0-9]+)?)",
-            r"\bRSI\b[^0-9]{0,40}([0-9]{1,3}(?:\.[0-9]+)?)",
         ]
         for p in patterns:
             m = re.search(p, html, re.IGNORECASE)
@@ -172,11 +172,8 @@ class Sp500RsiProvider(Provider):
 
     def _fetch_investing(self) -> Observation | None:
         html = self._get(self.INVESTING_URL, referer="https://www.investing.com/")
-        # 你要的是 “RSI(14) ... Buy” 这一行里的 Value（例如 69.858）
+        # 只接受 “RSI(14) ... Buy/Sell/Neutral” 这一行里的 Value，避免误抓页面其它数字。
         v = self._parse_investing_rsi14_value(html)
-        if v is None:
-            # 如果表格结构变了，再做一次通用 RSI 兜底
-            v = self._parse_rsi_from_html(html)
         if v is None:
             return None
         return Observation(
