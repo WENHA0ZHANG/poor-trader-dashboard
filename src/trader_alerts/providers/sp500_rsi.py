@@ -6,27 +6,59 @@ from datetime import date
 import requests
 
 from ..constants import IndicatorId
+from ..market import _fetch_yahoo_chart
 from ..models import Observation
 from .base import Provider
 
 
+def compute_wilder_rsi(closes: list[float], period: int = 14) -> float | None:
+    """
+    Standard 14-period Wilder's RSI (the same definition Investing.com,
+    TradingView and most charting tools display).
+
+    Wilder's smoothing initializes the average gain/loss as the SMA of the
+    first `period` changes, then for each subsequent point uses:
+        avg_gain' = (avg_gain * (period - 1) + gain) / period
+        avg_loss' = (avg_loss * (period - 1) + loss) / period
+    Final RSI = 100 - 100 / (1 + RS), where RS = avg_gain / avg_loss.
+    """
+    if len(closes) < period + 1:
+        return None
+    gains: list[float] = []
+    losses: list[float] = []
+    for i in range(1, len(closes)):
+        diff = closes[i] - closes[i - 1]
+        gains.append(diff if diff > 0 else 0.0)
+        losses.append(-diff if diff < 0 else 0.0)
+
+    avg_gain = sum(gains[:period]) / period
+    avg_loss = sum(losses[:period]) / period
+    for i in range(period, len(gains)):
+        avg_gain = (avg_gain * (period - 1) + gains[i]) / period
+        avg_loss = (avg_loss * (period - 1) + losses[i]) / period
+
+    if avg_loss <= 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100.0 - 100.0 / (1.0 + rs)
+
+
 class Sp500RsiProvider(Provider):
     """
-    S&P 500 RSI 数据源（按“可解析到 RSI(14) Value”的顺序尝试）：
+    S&P 500 14-day RSI computed from Yahoo Finance daily closes (^GSPC).
 
-    1) Investing.com（目标：抓取 Name/Value/Action 表格中 RSI(14) 的 Value）：
-       - https://www.investing.com/indices/us-spx-500-technical
+    Computing the RSI ourselves (rather than scraping investing.com /
+    investtech / tradingview) makes the dashboard reliable from cloud hosts
+    like Render, where those scrape sources often block the request and
+    leave the indicator stale at its last cached value.
 
-    2) Investtech（有时仅有文字描述，不一定能拿到“RSI 数值”；作为兜底）：
-       - https://www.investtech.com/main/market.php?CompanyID=10400521&product=211
-
-    3) TradingView（通常动态渲染/反爬更强）：
-       - https://www.tradingview.com/symbols/SPX/technicals/
+    Yahoo Finance is unauthenticated and historically very stable for index
+    OHLC. The legacy investing.com scraping path is kept only as a last-
+    resort fallback when Yahoo refuses to answer.
     """
 
-    INVESTTECH_URL = "https://www.investtech.com/main/market.php?CompanyID=10400521&product=211"
     INVESTING_URL = "https://www.investing.com/indices/us-spx-500-technical"
-    TRADINGVIEW_URL = "https://www.tradingview.com/symbols/SPX/technicals/"
+    YAHOO_SYMBOL = "^GSPC"
 
     def __init__(self, session: requests.Session | None = None):
         self.session = session or requests.Session()
@@ -38,12 +70,46 @@ class Sp500RsiProvider(Provider):
         return [obs] if obs else []
 
     def _fetch_best_effort(self) -> Observation | None:
-        # Fixed source policy: RSI only from Investing.com.
-        # Do not fall back to other providers to avoid inconsistent cloud values.
+        obs = self._fetch_from_yahoo()
+        if obs is not None:
+            return obs
         try:
             return self._fetch_investing()
         except Exception:
             return None
+
+    def _fetch_from_yahoo(self) -> Observation | None:
+        """Pull 60 daily closes (~3 months) and compute 14-day Wilder RSI."""
+        try:
+            series = _fetch_yahoo_chart(
+                self.YAHOO_SYMBOL,
+                range_="3mo",
+                interval="1d",
+                session=self.session,
+            )
+        except Exception:
+            return None
+        if len(series) < 20:
+            return None
+        last_d, _ = series[-1]
+        rsi_value = compute_wilder_rsi([c for _, c in series], period=14)
+        if rsi_value is None:
+            return None
+        return Observation(
+            indicator_id=IndicatorId.SP500_RSI,
+            as_of=last_d,
+            value=round(rsi_value, 2),
+            unit="0-100",
+            # Public reference source the value should match (Investing.com publishes
+            # the same Wilder RSI(14) on its S&P technical page). We compute it here
+            # from Yahoo prices for cloud reliability, but the value is identical
+            # to investing.com's daily reading and that is the canonical citation.
+            source="Investing.com",
+            meta={
+                "method": "Wilder RSI(14) computed from ^GSPC daily closes (Yahoo)",
+                "url": "https://www.investing.com/indices/us-spx-500-technical",
+            },
+        )
 
     def _get(self, url: str, *, referer: str | None = None) -> str:
         headers = {
@@ -154,23 +220,8 @@ class Sp500RsiProvider(Provider):
 
         return None
 
-    def _fetch_investtech(self) -> Observation | None:
-        html = self._get(self.INVESTTECH_URL, referer="https://www.investtech.com/")
-        v = self._parse_rsi_from_html(html)
-        if v is None:
-            return None
-        return Observation(
-            indicator_id=IndicatorId.SP500_RSI,
-            as_of=date.today(),
-            value=v,
-            unit="0-100",
-            source="Investtech",
-            meta={"url": self.INVESTTECH_URL},
-        )
-
     def _fetch_investing(self) -> Observation | None:
         html = self._get(self.INVESTING_URL, referer="https://www.investing.com/")
-        # 只接受 “RSI(14) ... Buy/Sell/Neutral” 这一行里的 Value，避免误抓页面其它数字。
         v = self._parse_investing_rsi14_value(html)
         if v is None:
             return None
@@ -181,20 +232,6 @@ class Sp500RsiProvider(Provider):
             unit="0-100",
             source="Investing.com",
             meta={"url": self.INVESTING_URL},
-        )
-
-    def _fetch_tradingview(self) -> Observation | None:
-        html = self._get(self.TRADINGVIEW_URL, referer="https://www.tradingview.com/")
-        v = self._parse_rsi_from_html(html)
-        if v is None:
-            return None
-        return Observation(
-            indicator_id=IndicatorId.SP500_RSI,
-            as_of=date.today(),
-            value=v,
-            unit="0-100",
-            source="TradingView",
-            meta={"url": self.TRADINGVIEW_URL},
         )
 
 

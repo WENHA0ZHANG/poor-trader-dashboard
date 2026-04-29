@@ -58,6 +58,79 @@ def init_market_overview(db_path: str | Path) -> None:
         )
 
 
+def init_news_cache(db_path: str | Path) -> None:
+    Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS news_cache (
+              cache_key TEXT NOT NULL,
+              as_of TEXT NOT NULL,
+              payload_json TEXT NOT NULL,
+              fetched_at TEXT NOT NULL,
+              PRIMARY KEY (cache_key, as_of)
+            )
+            """
+        )
+
+
+def get_cached_news(
+    db_path: str | Path,
+    cache_key: str,
+    as_of: str,
+    *,
+    max_age_seconds: int = 86400,
+) -> list[dict[str, Any]] | None:
+    init_news_cache(db_path)
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT payload_json, fetched_at
+            FROM news_cache
+            WHERE cache_key = ? AND as_of = ?
+            """,
+            (cache_key, as_of),
+        ).fetchone()
+    if not row:
+        return None
+    try:
+        fetched_str = row[1]
+        if fetched_str.endswith("Z"):
+            fetched_str = fetched_str[:-1]
+        fetched_at = datetime.fromisoformat(fetched_str).replace(tzinfo=timezone.utc)
+    except Exception:
+        return None
+    age = (datetime.now(timezone.utc) - fetched_at).total_seconds()
+    if age > max_age_seconds:
+        return None
+    try:
+        return json.loads(row[0]) or []
+    except Exception:
+        return None
+
+
+def upsert_cached_news(
+    db_path: str | Path,
+    cache_key: str,
+    as_of: str,
+    payload: list[dict[str, Any]],
+) -> None:
+    init_news_cache(db_path)
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    with _connect(db_path) as conn:
+        conn.execute(
+            """
+            INSERT INTO news_cache (cache_key, as_of, payload_json, fetched_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(cache_key, as_of)
+            DO UPDATE SET
+              payload_json=excluded.payload_json,
+              fetched_at=excluded.fetched_at
+            """,
+            (cache_key, as_of, json.dumps(payload, ensure_ascii=False), now),
+        )
+
+
 def upsert_observations(db_path: str | Path, observations: Iterable[Observation]) -> int:
     init_db(db_path)
     now = datetime.utcnow().isoformat(timespec="seconds") + "Z"

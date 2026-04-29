@@ -89,8 +89,22 @@ trader init
 ## Configuration
 
 - `FRED_API_KEY` (optional): enables FRED API access for US High Yield OAS.
+- `FINNHUB_KEY` (optional): enables Finnhub-powered news on the World Indices map and significant-move annotations on the Index Detail panel. Get a free key at https://finnhub.io/register. You can either export it as an env var (`export FINNHUB_KEY=...`) or drop it on the first line of a file called `finnhub_key.txt` in the project root (already in `.gitignore`). Without it, the map and trend chart still render with prices; news tooltips show a "set FINNHUB_KEY" hint.
 - `api_config.yaml`: optional HTTP data source configuration for private APIs.
 - `manual_input.yaml`: optional manual input template (generated via `trader init`).
+
+## Global Market Map
+
+Below the indicator and US market panels, the dashboard renders a Global Market Map with markers for the major indices we track:
+
+- US: S&P 500, Dow Jones, Nasdaq
+- Europe: FTSE 100, DAX, CAC 40
+- Developed Asia: Nikkei 225, Hang Seng, KOSPI, ASX 200, Singapore STI
+- Emerging Asia: Shanghai Composite, Sensex, Nifty 50, TWSE
+
+Each marker is colored by the day's % change (green for positive, red for negative). Hovering shows the day's headlines (Finnhub `/company-news` for US ETF proxies SPY/DIA/QQQ; keyword-filtered `/news?category=general` for non-US). Clicking a marker loads that index's 1M / 1Y / All trend curve in the Index Detail panel below, with pin annotations on the largest absolute moves; hover for headline summaries and click for the full per-day article list.
+
+If a price source can't be reached for some indices (e.g., upstream API quota) the dashboard falls back to a deterministic sample value so the map stays complete; the footer shows `Real data X/Y. Missing items fall back to sample values.` and any sample-data marker carries a small `sample` badge in its tooltip.
 
 ## Data Storage
 

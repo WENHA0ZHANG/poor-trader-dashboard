@@ -96,6 +96,59 @@ def _fetch_stooq_daily_closes(
     return rows
 
 
+def _fetch_yahoo_chart(
+    symbol: str,
+    *,
+    range_: str = "1y",
+    interval: str = "1d",
+    session: requests.Session | None = None,
+    timeout: tuple[float, float] = (3, 8),
+) -> list[tuple[date, float]]:
+    """
+    Yahoo Finance chart API (no auth, free):
+        https://query1.finance.yahoo.com/v8/finance/chart/^GSPC?range=1y&interval=1d
+
+    Returns chronological [(date, close), ...]. Skips entries where close is None
+    (Yahoo emits null for trading holidays/halts mid-series).
+    """
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+    params = {"range": range_, "interval": interval, "includePrePost": "false"}
+    headers = {
+        "User-Agent": "Mozilla/5.0",
+        "Accept": "application/json,text/plain,*/*",
+    }
+    s = session or requests.Session()
+    resp = s.get(url, params=params, headers=headers, timeout=timeout)
+    if resp.status_code != 200:
+        return []
+    try:
+        data = resp.json()
+        result = (data.get("chart") or {}).get("result") or []
+        if not result:
+            return []
+        r0 = result[0]
+        ts = r0.get("timestamp") or []
+        quote = (r0.get("indicators") or {}).get("quote") or []
+        if not ts or not quote:
+            return []
+        closes = quote[0].get("close") or []
+    except Exception:
+        return []
+
+    from datetime import datetime as _dt, timezone as _tz
+
+    out: list[tuple[date, float]] = []
+    for t, c in zip(ts, closes):
+        if c is None:
+            continue
+        try:
+            d = _dt.fromtimestamp(int(t), tz=_tz.utc).date()
+        except Exception:
+            continue
+        out.append((d, float(c)))
+    return out
+
+
 def _normalize_stock_symbol(raw: str) -> tuple[str, str] | None:
     s = (raw or "").strip().upper().replace(" ", "")
     if not s:
@@ -110,75 +163,82 @@ def _normalize_stock_symbol(raw: str) -> tuple[str, str] | None:
     return (f"{s}.US", s)
 
 
+_DEFAULT_ITEMS: list[dict[str, str]] = [
+    # symbol = legacy stooq id (used as the row key on the front-end);
+    # yahoo  = corresponding Yahoo Finance ticker (primary live source).
+    {"symbol": "^spx",      "yahoo": "^GSPC",   "name": "^SPX"},
+    {"symbol": "^dji",      "yahoo": "^DJI",    "name": "^DJI"},
+    {"symbol": "^ndq",      "yahoo": "^IXIC",   "name": "^NDQ"},
+    {"symbol": "btc.v",     "yahoo": "BTC-USD", "name": "BTC"},
+    {"symbol": "xauusd",    "yahoo": "GC=F",    "name": "XAU"},
+    {"symbol": "xagusd",    "yahoo": "SI=F",    "name": "XAG"},
+    {"symbol": "brk-b.us",  "yahoo": "BRK-B",   "name": "BRK-B"},
+    {"symbol": "ko.us",     "yahoo": "KO",      "name": "KO"},
+    {"symbol": "rklb.us",   "yahoo": "RKLB",    "name": "RKLB"},
+    {"symbol": "amzn.us",   "yahoo": "AMZN",    "name": "AMZN"},
+]
+
+
 def get_us_index_overview_rows(extra_symbols: list[str] | None = None) -> list[dict[str, Any]]:
     """
-    Output dict rows for template use.
+    Live overview rows for the front-end's three market tables.
 
-    1 week/month/3 months/1 year:
-    - Approximate by "trading day count": 1W=5T, 1M=21T, 3M=63T, 1Y=252T
+    Primary source: Yahoo Finance chart API (free, no auth, decent uptime). The
+    legacy stooq path is used only as a fallback because stooq's daily-CSV
+    endpoint now requires an apikey, which makes it unreliable from cloud
+    hosts (e.g., Render).
     """
     end = date.today()
-    start = end - timedelta(days=900)  # Enough to cover 252 trading days + holiday buffer
+    start = end - timedelta(days=900)  # Enough for 252 trading days + holiday buffer
     session = requests.Session()
 
-    # Stooq symbols: indices, stocks, bitcoin, gold, silver
-    index_items = [
-        ("^spx", "^SPX"),
-        ("^dji", "^DJI"),
-        ("^ndq", "^NDQ"),
-    ]
-    asset_items = [
-        ("BTC.V", "BTC"),
-        ("XAUUSD", "XAU"),
-        ("XAGUSD", "XAG"),
-    ]
-    stock_items = [
-        ("BRK-B.US", "BRK-B"),
-        ("KO.US", "KO"),
-        ("RKLB.US", "RKLB"),
-        ("AMZN.US", "AMZN"),
-    ]
+    items: list[dict[str, str]] = list(_DEFAULT_ITEMS)
+    seen = {it["symbol"].lower() for it in items}
 
-    extra_items: list[tuple[str, str]] = []
     for raw in extra_symbols or []:
         norm = _normalize_stock_symbol(raw)
-        if norm:
-            extra_items.append(norm)
-
-    seen = {sym.lower() for sym, _ in (index_items + asset_items + stock_items)}
-    deduped_extra = []
-    for sym, name in extra_items:
-        if sym.lower() in seen:
+        if not norm:
             continue
-        seen.add(sym.lower())
-        deduped_extra.append((sym, name))
+        legacy_sym, ticker = norm  # ("AAPL.US", "AAPL")
+        if legacy_sym.lower() in seen:
+            continue
+        seen.add(legacy_sym.lower())
+        items.append({"symbol": legacy_sym.lower(), "yahoo": ticker, "name": ticker})
 
-    items = index_items + asset_items + stock_items + deduped_extra
+    def _fetch_one(it: dict[str, str]) -> dict[str, Any] | None:
+        legacy_sym = it["symbol"]
+        yh = it["yahoo"]
+        name = it["name"]
 
-    def _fetch_one(sym: str, name: str) -> dict[str, Any] | None:
-        series = _fetch_stooq_daily_closes(sym, start=start, end=end, session=session)
-        if not series:
-            return None
-
-        # 用 quote 的最新日期/最新收盘价（通常更新到最近一个交易日），避免 daily CSV 停留在更旧日期
-        quote = None
+        series: list[tuple[date, float]] = []
+        # Yahoo first.
         try:
-            quote = _fetch_stooq_quote(sym, session=session)
+            series = _fetch_yahoo_chart(yh, range_="2y", interval="1d", session=session)
         except Exception:
-            quote = None
+            series = []
+
+        # Stooq fallback.
+        if not series:
+            try:
+                series = _fetch_stooq_daily_closes(legacy_sym, start=start, end=end, session=session)
+            except Exception:
+                series = []
+            try:
+                quote = _fetch_stooq_quote(legacy_sym, session=session)
+            except Exception:
+                quote = None
+            if series and quote is not None:
+                qd, qc = quote
+                if qd > series[-1][0]:
+                    series.append((qd, qc))
+                elif qd == series[-1][0]:
+                    series[-1] = (qd, qc)
+
+        if not series or len(series) < 2:
+            return None
 
         as_of, last_close = series[-1]
         closes = [c for _, c in series]
-        if quote is not None:
-            qd, qc = quote
-            if qd > as_of:
-                # daily 还没更新到 qd，把 quote 作为最新一根补到末尾
-                as_of, last_close = qd, qc
-                closes.append(qc)
-            elif qd == as_of:
-                # 同一天：用 quote 的 close 覆盖，避免日线数据延迟/误差
-                as_of, last_close = qd, qc
-                closes[-1] = qc
 
         def chg(n_trading_days: int) -> float | None:
             idx = len(closes) - 1 - n_trading_days
@@ -187,23 +247,23 @@ def get_us_index_overview_rows(extra_symbols: list[str] | None = None) -> list[d
             return _pct_change(last_close, closes[idx])
 
         row = IndexOverviewRow(
-            symbol=sym,
+            symbol=legacy_sym,
             name=name,
-            as_of=as_of.strftime("%m-%d"),  # Only show month-day, no year
+            as_of=as_of.strftime("%m-%d"),
             close=last_close,
             chg_1w_pct=chg(5),
             chg_1m_pct=chg(21),
             chg_3m_pct=chg(63),
             chg_1y_pct=chg(252),
-            source_url=f"https://stooq.com/q/l/?s={sym}",
+            source_url=f"https://finance.yahoo.com/quote/{yh}",
         )
         return asdict(row)
 
-    # 并发抓取：任何一个 symbol 慢/挂都不应拖死整块面板
+    # Concurrent fetch: don't let one slow symbol stall the whole panel.
     out: list[dict[str, Any]] = []
     max_workers = min(8, max(1, len(items)))
     with ThreadPoolExecutor(max_workers=max_workers) as ex:
-        futs = {ex.submit(_fetch_one, sym, name): (sym, name) for sym, name in items}
+        futs = {ex.submit(_fetch_one, it): it for it in items}
         for fut in as_completed(futs):
             try:
                 row = fut.result()
