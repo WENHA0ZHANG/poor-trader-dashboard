@@ -31,6 +31,17 @@ class IndicatorId(str, Enum):
     # Extra) Volatility (CNN Fear & Greed page)
     VIX = "vix"
 
+    # Extra) Tail-risk hedging cost (CBOE SKEW, via Yahoo ^SKEW).
+    # Rises when institutions pay up for far-OTM puts; sustained >145 has
+    # often preceded sharp drawdowns (early 2020, late 2021, summer 2024).
+    CBOE_SKEW = "cboe_skew"
+
+    # Extra) Yield curve – 10Y minus 2Y Treasury yield (FRED T10Y2Y).
+    # Inversion <0% has preceded every U.S. recession since 1980; the
+    # rapid re-steepening (move from negative back through 0) tends to
+    # mark the late-cycle window where bear markets actually hit.
+    YC_10Y_2Y = "yc_10y_2y"
+
 
 ALL_INDICATORS: tuple[IndicatorId, ...] = (
     IndicatorId.BOFA_BULL_BEAR,                    # Investor Sentiment Bull-Bear Spread
@@ -42,6 +53,8 @@ ALL_INDICATORS: tuple[IndicatorId, ...] = (
     IndicatorId.NASDAQ100_PE_RATIO,               # Nasdaq 100 Price-to-Earnings Ratio
     IndicatorId.NASDAQ100_ABOVE_20D_MA,           # Nasdaq 100 Above 20-Day Moving Average (%)
     IndicatorId.US_HIGH_YIELD_SPREAD,             # US High Yield Option-Adjusted Spread
+    IndicatorId.CBOE_SKEW,                        # CBOE SKEW (tail-risk hedging)
+    IndicatorId.YC_10Y_2Y,                        # 10Y-2Y Treasury yield curve
 )
 
 

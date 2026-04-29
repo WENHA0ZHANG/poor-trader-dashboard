@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import re
 from pathlib import Path
 import threading
@@ -38,7 +38,16 @@ from ..storage import (
     upsert_market_overview_rows,
     list_market_overview_rows,
 )
-from ..market import get_us_index_overview_rows
+from ..market import get_us_index_overview_rows, _fetch_yahoo_chart, _DEFAULT_ITEMS
+from ..world import (
+    WORLD_INDICES,
+    get_index_history,
+    get_index_meta,
+    get_world_overview,
+)
+from ..news import fetch_news_for_index, fetch_company_news, is_enabled as news_is_enabled
+from ..backfill import backfill_history
+from ..regime import compute_market_regime
 
 
 def create_app(
@@ -61,6 +70,18 @@ def create_app(
     cached_market_at: datetime | None = None
     market_lock = threading.Lock()
     market_refreshing = False
+
+    # World indices cache: refreshed in background on first hit, then every 5 min
+    cached_world_rows: list[dict[str, Any]] = []
+    cached_world_at: datetime | None = None
+    world_lock = threading.Lock()
+    world_refreshing = False
+
+    # One-shot indicator history backfill (RSI + VIX) on first request,
+    # so a freshly-deployed instance with an empty SQLite immediately has
+    # ~1 year of history for the trend chart.
+    backfill_lock = threading.Lock()
+    backfill_done = False
 
     # Default: fetch all dashboard indicators (can be overridden by auto_fetch_providers)
     providers = [
@@ -221,6 +242,51 @@ def create_app(
         t = threading.Thread(target=_run, daemon=True)
         t.start()
 
+    def _kick_history_backfill() -> None:
+        """One-shot, async backfill of RSI/VIX daily history from Yahoo."""
+        nonlocal backfill_done
+        with backfill_lock:
+            if backfill_done:
+                return
+            backfill_done = True
+
+        def _run() -> None:
+            try:
+                backfill_history(str(resolved_db))
+            except Exception:
+                pass
+
+        threading.Thread(target=_run, daemon=True).start()
+
+    def _kick_world_refresh(*, force: bool) -> None:
+        """Async refresh of the world-indices cache."""
+        nonlocal cached_world_rows, cached_world_at, world_refreshing
+
+        with world_lock:
+            if world_refreshing:
+                return
+            now = datetime.now(timezone.utc)
+            # 5-min freshness window when not forced
+            if (not force) and cached_world_at and (now - cached_world_at) <= timedelta(seconds=300):
+                return
+            world_refreshing = True
+
+        def _run() -> None:
+            nonlocal cached_world_rows, cached_world_at, world_refreshing
+            try:
+                rows = get_world_overview(db_path=resolved_db, with_news=True)
+                with world_lock:
+                    cached_world_rows = rows or []
+                    cached_world_at = datetime.now(timezone.utc)
+            except Exception:
+                pass
+            finally:
+                with world_lock:
+                    world_refreshing = False
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
+
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> Any:
         refresh = str(request.query_params.get("refresh") or "").strip().lower() in {"1", "true", "yes", "y"}
@@ -240,6 +306,13 @@ def create_app(
         _kick_market_refresh(force=refresh)
         with market_lock:
             market_rows = list(cached_market_rows)
+
+        # Kick the world indices refresh so the map has data ready ASAP.
+        _kick_world_refresh(force=refresh)
+
+        # Backfill ~1y of RSI / VIX history on first request, so the trend
+        # chart is meaningful even on a freshly-deployed instance.
+        _kick_history_backfill()
 
         # History (hardcoded in historical.py, no longer dynamically fetch long historical data)
         from ..historical import get_historical_events
@@ -267,6 +340,21 @@ def create_app(
         top_signals = [s for s in signals if s.top]
         bottom_signals = [s for s in signals if s.bottom]
 
+        # Composite "Market Regime" reading: combine all current indicators
+        # into a single Strong Buy / Buy / Cautious Buy / Neutral / Caution
+        # / Risk / Strong Risk label. The yield-curve top signal only
+        # counts when there has been a recent inversion. The historical
+        # "post-inversion danger window" lasts roughly 24 months from the
+        # inversion ending — that's the period when the equity bear
+        # market historically tends to actually arrive — so we look back
+        # ~720 days for any negative T10Y2Y print.
+        try:
+            yc_history = recent_observations(resolved_db, IndicatorId.YC_10Y_2Y, 720)
+            yc_recently_inverted = any(float(o.value) < 0 for o in yc_history)
+        except Exception:
+            yc_recently_inverted = True  # safe default for current macro era
+        regime = compute_market_regime(latest, yc_recently_inverted=yc_recently_inverted)
+
         # Build signal dictionary for easy lookup
         signal_map = {s.indicator_id: s for s in signals}
 
@@ -281,19 +369,23 @@ def create_app(
             IndicatorId.SP500_RSI: "S&P 500 Relative Strength Index",
             IndicatorId.NASDAQ100_ABOVE_20D_MA: "Nasdaq 100 Above 20-Day Moving Average (%)",
             IndicatorId.VIX: "S&P 500 Volatility Index",
+            IndicatorId.CBOE_SKEW: "CBOE SKEW (Tail-Risk Hedging)",
+            IndicatorId.YC_10Y_2Y: "10Y-2Y Treasury Yield Curve",
         }
 
         # Indicator ID to source URL mapping
         indicator_source_urls = {
-            IndicatorId.US_HIGH_YIELD_SPREAD: "https://tradingeconomics.com/united-states/bofa-merrill-lynch-us-high-yield-option-adjusted-spread-fed-data.html",
+            IndicatorId.US_HIGH_YIELD_SPREAD: "https://fred.stlouisfed.org/series/BAMLH0A0HYM2",
             IndicatorId.BOFA_BULL_BEAR: "https://ycharts.com/indicators/us_investor_sentiment_bull_bear_spread",
             IndicatorId.CNN_FEAR_GREED_INDEX: "https://edition.cnn.com/markets/fear-and-greed",
             IndicatorId.CNN_PUT_CALL_OPTIONS: "https://edition.cnn.com/markets/fear-and-greed",
-            IndicatorId.SP500_PE_RATIO: "https://www.multpl.com/s-p-500-pe-ratio",
+            IndicatorId.SP500_PE_RATIO: "https://www.multpl.com/s-p-500-pe-ratio/table/by-month",
             IndicatorId.NASDAQ100_PE_RATIO: "https://www.barrons.com/market-data/stocks/us/pe-yields",
             IndicatorId.SP500_RSI: "https://www.investing.com/indices/us-spx-500-technical",
             IndicatorId.NASDAQ100_ABOVE_20D_MA: "https://www.barchart.com/stocks/quotes/$NDTW",
             IndicatorId.VIX: "https://edition.cnn.com/markets/fear-and-greed",
+            IndicatorId.CBOE_SKEW: "https://finance.yahoo.com/quote/%5ESKEW",
+            IndicatorId.YC_10Y_2Y: "https://fred.stlouisfed.org/series/T10Y2Y",
         }
 
         # Make it easier to use in template
@@ -317,6 +409,10 @@ def create_app(
                         value_display = f"{float(value_display):.2f}"
                     elif ind in {IndicatorId.SP500_PE_RATIO, IndicatorId.NASDAQ100_PE_RATIO}:
                         value_display = f"{float(value_display):.2f}"
+                    elif ind == IndicatorId.CBOE_SKEW:
+                        value_display = f"{float(value_display):.2f}"
+                    elif ind == IndicatorId.YC_10Y_2Y:
+                        value_display = f"{float(value_display):+.2f}"
                 except (ValueError, TypeError):
                     pass
 
@@ -362,6 +458,7 @@ def create_app(
                 "bottom_signals": bottom_signals,
                 "top_score": len(top_signals),
                 "bottom_score": len(bottom_signals),
+                "regime": regime,
                 "pe_percentile": pe_pct,
                 "sources": [
                     {"name": "US High Yield OAS (Primary)", "url": "https://tradingeconomics.com/united-states/bofa-merrill-lynch-us-high-yield-option-adjusted-spread-fed-data.html"},
@@ -420,6 +517,94 @@ def create_app(
             "refreshing": refreshing,
         }
 
+    def _to_yahoo_symbol(raw: str) -> str | None:
+        """
+        Best-effort translation from a row's `symbol` field (legacy Stooq
+        style, Yahoo style, or plain ticker) to a Yahoo Chart API ticker.
+
+        Order of resolution:
+          1. Look up in market._DEFAULT_ITEMS (e.g. "^spx" -> "^GSPC").
+          2. If it ends in ".us" or ".US" (user-added stock), strip suffix.
+          3. Otherwise return as-is, uppercased (already a Yahoo ticker).
+        """
+        if not raw:
+            return None
+        s = str(raw).strip()
+        if not s:
+            return None
+        try:
+            for it in _DEFAULT_ITEMS:
+                if it.get("symbol", "").lower() == s.lower():
+                    return it.get("yahoo")
+        except Exception:
+            pass
+        if s.lower().endswith(".us"):
+            return s[:-3].upper()
+        return s.upper() if s.isascii() else s
+
+    def _is_us_equity_ticker(yahoo_sym: str) -> bool:
+        """
+        Heuristic: only call Finnhub /company-news for plain US-equity-style
+        tickers. Indices ("^GSPC"), futures ("GC=F"), crypto ("BTC-USD"),
+        and FX symbols won't return useful results from /company-news.
+        """
+        if not yahoo_sym:
+            return False
+        s = yahoo_sym.upper()
+        if any(c in s for c in ("^", "=", "-USD", "USD=")):
+            return False
+        return all(c.isalpha() or c == "-" or c.isdigit() for c in s)
+
+    @app.get("/api/stock-detail")
+    def api_stock_detail(symbol: str, range: str = "1y") -> dict[str, Any]:
+        """
+        Per-symbol detail used by the Market page right-pane: 1y price
+        history (daily) + recent Finnhub news (last 30 days, US equities
+        only).
+        """
+        yh = _to_yahoo_symbol(symbol)
+        if not yh:
+            return {"symbol": symbol, "error": "Unknown symbol"}
+
+        rng = range if range in ("1mo", "3mo", "6mo", "1y", "2y", "5y") else "1y"
+        series: list[dict[str, Any]] = []
+        latest_close: float | None = None
+        chg_pct: float | None = None
+        try:
+            pairs = _fetch_yahoo_chart(yh, range_=rng, interval="1d")
+        except Exception:
+            pairs = []
+        for d, c in pairs or []:
+            series.append({"date": d.strftime("%Y-%m-%d"), "close": float(c)})
+        if series:
+            latest_close = series[-1]["close"]
+            if len(series) > 1:
+                first = series[0]["close"]
+                if first:
+                    chg_pct = (latest_close - first) / first * 100.0
+
+        articles: list[dict[str, Any]] = []
+        if news_is_enabled() and _is_us_equity_ticker(yh):
+            try:
+                today = date.today()
+                from_d = today - timedelta(days=30)
+                articles = fetch_company_news(yh, from_d, today, db_path=resolved_db)
+            except Exception:
+                articles = []
+            articles = articles[:8]
+
+        return {
+            "symbol": symbol,
+            "yahoo": yh,
+            "range": rng,
+            "latest_close": latest_close,
+            "chg_pct": chg_pct,
+            "series": series,
+            "news": articles,
+            "news_enabled": news_is_enabled(),
+            "is_us_equity": _is_us_equity_ticker(yh),
+        }
+
     @app.get("/api/latest")
     def api_latest() -> Any:
         latest = list_latest(resolved_db)
@@ -439,6 +624,28 @@ def create_app(
         alerts = compute_alerts(resolved_db, list(ALL_INDICATORS))
         return [asdict(a) for a in alerts]
 
+    @app.get("/api/regime")
+    def api_regime() -> dict[str, Any]:
+        latest = list_latest(resolved_db)
+        try:
+            yc_history = recent_observations(resolved_db, IndicatorId.YC_10Y_2Y, 720)
+            recently_inverted = any(float(o.value) < 0 for o in yc_history)
+        except Exception:
+            recently_inverted = True
+        r = compute_market_regime(latest, yc_recently_inverted=recently_inverted)
+        return {
+            "score": r.score,
+            "buy_points": r.buy_points,
+            "risk_points": r.risk_points,
+            "label": r.label,
+            "css_class": r.css_class,
+            "summary": r.summary,
+            "contributions": r.contributions,
+            "coverage": r.coverage,
+            "total": r.total,
+            "yc_recently_inverted": recently_inverted,
+        }
+
     @app.get("/api/indicator-history")
     def api_indicator_history(indicator_id: str, days: int = 3650) -> dict[str, Any]:
         try:
@@ -449,13 +656,20 @@ def create_app(
         thresholds: dict[IndicatorId, dict[str, float]] = {
             IndicatorId.BOFA_BULL_BEAR: {"top": 20.0, "bottom": -20.0},
             IndicatorId.CNN_FEAR_GREED_INDEX: {"top": 75.0, "bottom": 25.0},
-            IndicatorId.CNN_PUT_CALL_OPTIONS: {"top": 0.6, "bottom": 0.8},
+            IndicatorId.CNN_PUT_CALL_OPTIONS: {"top": 0.55, "bottom": 0.95},
             IndicatorId.VIX: {"top": 14.0, "bottom": 25.0},
             IndicatorId.SP500_RSI: {"top": 70.0, "bottom": 30.0},
-            IndicatorId.SP500_PE_RATIO: {"top": 32.0, "bottom": 22.0},
-            IndicatorId.NASDAQ100_PE_RATIO: {"top": 35.0, "bottom": 28.0},
+            IndicatorId.SP500_PE_RATIO: {"top": 30.0, "bottom": 20.0},
+            IndicatorId.NASDAQ100_PE_RATIO: {"top": 35.0, "bottom": 22.0},
             IndicatorId.NASDAQ100_ABOVE_20D_MA: {"top": 80.0, "bottom": 20.0},
             IndicatorId.US_HIGH_YIELD_SPREAD: {"top": 2.8, "bottom": 4.5},
+            IndicatorId.CBOE_SKEW: {"top": 155.0},
+            # 10Y-2Y is special: the "top warning" is a BAND (post-inversion
+            # re-steepening window), not a single threshold. We emit a
+            # `top_zone` instead of a `top` here. There is no clean single
+            # "bottom" threshold either — true bottoms only register when
+            # the curve is steep AND panic indicators co-fire — so we skip it.
+            IndicatorId.YC_10Y_2Y: {"top_zone": [-0.05, 0.6]},
         }
 
         days = max(1, min(int(days), 36500))
@@ -486,6 +700,96 @@ def create_app(
             "series": series,
             "top": th.get("top"),
             "bottom": th.get("bottom"),
+            # Optional shaded band rendered as a tinted top "danger zone".
+            # Used for indicators where the warning is a range, not a line
+            # (e.g. yield curve re-steepening window).
+            "top_zone": th.get("top_zone"),
+            "bottom_zone": th.get("bottom_zone"),
+        }
+
+    @app.get("/api/world-indices")
+    def api_world_indices(request: Request) -> dict[str, Any]:
+        """
+        World-indices overview for the map module: latest close, 1d % change,
+        and up to 3 headlines per index. Background-refreshed; an empty initial
+        response is fine (the front-end shows a 'Loading...' state).
+        """
+        force = str(request.query_params.get("refresh") or "").strip().lower() in {"1", "true", "yes", "y"}
+        _kick_world_refresh(force=force)
+        with world_lock:
+            rows = list(cached_world_rows)
+            at = cached_world_at
+            refreshing = world_refreshing
+        total = len(WORLD_INDICES)
+        real_count = sum(1 for r in rows if r.get("ok") and not r.get("is_sample"))
+        sample_count = sum(1 for r in rows if r.get("ok") and r.get("is_sample"))
+        return {
+            "rows": rows,
+            "as_of_utc": at.isoformat() if at else None,
+            "refreshing": refreshing,
+            "news_enabled": news_is_enabled(),
+            "real_count": real_count,
+            "sample_count": sample_count,
+            "total": total,
+            "indices_meta": [
+                {
+                    "stooq": m["stooq"],
+                    "name": m["name"],
+                    "country": m["country"],
+                    "iso": m["iso"],
+                }
+                for m in WORLD_INDICES
+            ],
+        }
+
+    @app.get("/api/index-history")
+    def api_index_history(request: Request) -> dict[str, Any]:
+        symbol = str(request.query_params.get("symbol") or "").strip().lower()
+        range_key = str(request.query_params.get("range") or "1y").strip().lower()
+        if range_key not in {"1m", "1y", "all"}:
+            range_key = "1y"
+        if not symbol:
+            return {"error": "missing symbol", "series": [], "significant": []}
+        if not get_index_meta(symbol):
+            return {"error": f"unknown symbol {symbol}", "series": [], "significant": []}
+        try:
+            data = get_index_history(symbol, range_key, db_path=resolved_db)
+            data["news_enabled"] = news_is_enabled()
+            return data
+        except Exception as e:
+            return {
+                "error": str(e),
+                "series": [],
+                "significant": [],
+                "news_enabled": news_is_enabled(),
+            }
+
+    @app.get("/api/index-news")
+    def api_index_news(request: Request) -> dict[str, Any]:
+        from datetime import date as _date
+
+        symbol = str(request.query_params.get("symbol") or "").strip().lower()
+        date_str = str(request.query_params.get("date") or "").strip()
+        try:
+            limit = max(1, min(int(request.query_params.get("limit") or 5), 20))
+        except Exception:
+            limit = 5
+        meta = get_index_meta(symbol)
+        if not meta:
+            return {"articles": [], "error": f"unknown symbol {symbol}", "news_enabled": news_is_enabled()}
+        try:
+            target = _date.fromisoformat(date_str) if date_str else _date.today()
+        except Exception:
+            target = _date.today()
+        try:
+            articles = fetch_news_for_index(meta, target, db_path=resolved_db, limit=limit)
+        except Exception:
+            articles = []
+        return {
+            "articles": articles,
+            "symbol": symbol,
+            "date": target.isoformat(),
+            "news_enabled": news_is_enabled(),
         }
 
     # Store auto_fetch state for toggling (simplified approach)
