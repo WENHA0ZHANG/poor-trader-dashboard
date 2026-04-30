@@ -45,37 +45,34 @@ designed to turn public market data into a practical decision framework:
 > equity tops and bottoms since 2000 — see the in-app *History* section
 > on page 4 for the side-by-side numbers.
 
-## 📋 Signal Track Record
-
-> Signals are logged as dated, verifiable calls — not after-the-fact screenshots.
+---
 
 <table>
-<tr>
-<td>
+<tr><td>
 
-### 🟢 2026-03-30 · Bottom Call · **+6.40 Buy**
+## 📋 Signal Track Record
 
-<sup>VIX 30.6 · F&G 13.7 · NDX>20d 18.8% · AAII -21.6% · RSI 27.7 · YC +0.53%</sup>
+Signals are logged as dated calls so the model can be verified against
+real market outcomes — not after-the-fact screenshots.
 
-| | Tier | Wt | Pts |
-|:--|:--:|:--:|--:|
-| **VIX** 30.61 | +2 | 1.5 | **+3.00** |
-| **Fear & Greed** 13.69 | +2 | 1.0 | **+2.00** |
-| **NDX > 20d MA** 18.81% | +1 | 1.0 | **+1.00** |
-| **AAII Bull-Bear** -21.60% | +1 | 0.7 | **+0.70** |
-| **S&P 500 RSI** 27.72 | +1 | 0.7 | **+0.70** |
-| **10Y-2Y Curve** +0.53% | -1 | 1.0 | **-1.00** |
+</td></tr>
+<tr><td>
 
-**Buy +7.40** · Risk -1.00 · Composite **+6.40**
+### 🟢 2026-03-30 — Bottom Call&ensp;·&ensp;Score **+6.40**&ensp;·&ensp;Regime **Buy**
 
-> Multiple fear indicators hit capitulation-level extremes simultaneously.
-> The S&P 500 subsequently rallied ~14% over the following 4 weeks.
+> VIX 30.6 (+3.0) · F&G 13.7 (+2.0) · NDX Breadth 18.8% (+1.0) · AAII -21.6% (+0.7) · RSI 27.7 (+0.7) · Yield Curve +0.53% (−1.0)
+>
+> **Buy +7.40 / Risk −1.00 → +6.40**&ensp;—&ensp;Volatility, fear, breadth and momentum all near capitulation simultaneously.
 
-</td>
-</tr>
+</td></tr>
+<tr><td>
+
+*More entries will appear here as future signals fire. Red (🔴) = top/risk call, Green (🟢) = bottom/buy call.*
+
+</td></tr>
 </table>
 
-<!-- Future signals will be appended as new <tr><td> rows above. -->
+---
 
 ## The Pages
 
