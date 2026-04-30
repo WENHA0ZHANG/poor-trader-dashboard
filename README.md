@@ -45,32 +45,96 @@ designed to turn public market data into a practical decision framework:
 > equity tops and bottoms since 2000 — see the in-app *History* section
 > on page 4 for the side-by-side numbers.
 
-## Signal Track Record
+---
 
-Poor2Rich is still a research framework, but its signals are tracked as
-dated calls so the model can be judged against market outcomes rather
-than screenshots after the fact.
+<h2 align="center">📊 Signal Track Record</h2>
 
-### 2026-03-30 · Bottom Signal
+<p align="center">
+  <em>Every signal is logged with its full score breakdown on the date it fired,
+  so the model is judged by outcomes — not hindsight.</em>
+</p>
 
-On **2026-03-30**, Poor2Rich generated a **Buy** regime with a
-**+6.40** composite score. The model identified a bottom-risk/reward
-setup because volatility, fear, breadth and momentum were all stretched
-toward capitulation at the same time.
+<br>
 
-| Component | Latest reading used | Tier | Weight | Points |
-|---|---:|---:|---:|---:|
-| VIX | 30.61 | +2 | 1.5 | +3.00 |
-| Fear & Greed Index | 13.69 | +2 | 1.0 | +2.00 |
-| NDX > 20d MA | 18.81% | +1 | 1.0 | +1.00 |
-| AAII Bull-Bear | -21.60% | +1 | 0.7 | +0.70 |
-| S&P 500 RSI(14) | 27.72 | +1 | 0.7 | +0.70 |
-| 10Y-2Y Curve | +0.53% | -1 | 1.0 | -1.00 |
-| Other tracked indicators | Normal range | 0 | mixed | 0.00 |
+<!-- ── 2026-03-30 · BOTTOM CALL ──────────────────────────────────────────── -->
 
-**Buy points:** +7.40  
-**Risk points:** -1.00  
-**Composite:** +6.40 (**Buy**)
+<table align="center">
+<tr>
+<td>
+
+<h3>🟢 2026-03-30 · Bottom Call &nbsp;&nbsp;
+  <img src="https://img.shields.io/badge/regime-Buy-22c55e?style=for-the-badge" alt="Buy">
+  <img src="https://img.shields.io/badge/score-+6.40-22c55e?style=for-the-badge" alt="+6.40">
+  <img src="https://img.shields.io/badge/result-✓ confirmed-16a34a?style=for-the-badge" alt="Confirmed">
+</h3>
+
+Poor2Rich flagged a **Buy** regime on **2026-03-30** — volatility,
+fear, breadth and momentum all simultaneously stretched toward
+capitulation levels. The S&P 500 reversed upward in the following
+sessions, confirming the bottom window.
+
+<table>
+<thead>
+<tr>
+  <th>Component</th>
+  <th align="right">Reading</th>
+  <th align="center">Tier</th>
+  <th align="center">Weight</th>
+  <th align="right">Points</th>
+</tr>
+</thead>
+<tbody>
+<tr bgcolor="#052e16">
+  <td>🟢 VIX</td><td align="right">30.61</td>
+  <td align="center">+2</td><td align="center">1.5</td>
+  <td align="right"><strong>+3.00</strong></td>
+</tr>
+<tr bgcolor="#052e16">
+  <td>🟢 Fear & Greed Index</td><td align="right">13.69</td>
+  <td align="center">+2</td><td align="center">1.0</td>
+  <td align="right"><strong>+2.00</strong></td>
+</tr>
+<tr bgcolor="#052e16">
+  <td>🟢 NDX > 20d MA</td><td align="right">18.81%</td>
+  <td align="center">+1</td><td align="center">1.0</td>
+  <td align="right"><strong>+1.00</strong></td>
+</tr>
+<tr bgcolor="#052e16">
+  <td>🟢 AAII Bull-Bear</td><td align="right">-21.60%</td>
+  <td align="center">+1</td><td align="center">0.7</td>
+  <td align="right"><strong>+0.70</strong></td>
+</tr>
+<tr bgcolor="#052e16">
+  <td>🟢 S&P 500 RSI(14)</td><td align="right">27.72</td>
+  <td align="center">+1</td><td align="center">0.7</td>
+  <td align="right"><strong>+0.70</strong></td>
+</tr>
+<tr bgcolor="#450a0a">
+  <td>🔴 10Y-2Y Curve</td><td align="right">+0.53%</td>
+  <td align="center">-1</td><td align="center">1.0</td>
+  <td align="right"><strong>-1.00</strong></td>
+</tr>
+<tr>
+  <td><em>Other indicators</em></td><td align="right">Normal range</td>
+  <td align="center">0</td><td align="center">—</td>
+  <td align="right">0.00</td>
+</tr>
+</tbody>
+</table>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Buy_points-+7.40-22c55e?style=flat-square" alt="+7.40">
+  &nbsp;
+  <img src="https://img.shields.io/badge/Risk_points--1.00-ef4444?style=flat-square" alt="-1.00">
+  &nbsp;
+  <img src="https://img.shields.io/badge/Composite-+6.40_(Buy)-22c55e?style=flat-square&labelColor=064e3b" alt="+6.40 Buy">
+</p>
+
+</td>
+</tr>
+</table>
+
+---
 
 ## The Pages
 
