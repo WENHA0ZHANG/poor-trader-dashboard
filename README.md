@@ -1,38 +1,43 @@
 # Poor Trader Dashboard
 
-**A live dashboard that calls market tops and bottoms with one number.**
+**A decision-support dashboard for timing market risk and opportunity.**
 
-Poor Trader Dashboard is an open, free-to-use market-timing tool that
-distills eleven of the most predictive macro, valuation and sentiment
-indicators into a single composite score — the **Poor2Rich score** — and
-classifies the US equity market into one of seven regimes, from *Strong
-Buy* through *Neutral* to *Strong Risk*.
+Poor Trader Dashboard is an open, free-to-use research assistant for
+investors and traders. It combines multiple high-correlation macro,
+valuation, sentiment, volatility and breadth indicators into one
+transparent algorithm — the **Poor2Rich score** — to help users identify
+potential buying windows, take-profit zones and drawdown-risk periods in
+the US equity market.
 
 🌐 **Live: https://poortrader.com/**
 
 It runs entirely on Cloudflare Workers + Pages with a D1 (SQLite) backing
-store, refreshes hourly, and is built to be glanceable: open the page,
-see where the market sits, drill in if you want to.
+store, refreshes hourly, and is designed for fast decision review: check
+the current regime, inspect the signal drivers, then drill into charts,
+news and history when a score needs confirmation.
 
-## Product Overview
+## Purpose
 
-Most macro tools either bury the user in dozens of charts or hand back a
-single black-box score with no traceability. Poor Trader Dashboard is
-designed to do both:
+Most market dashboards either bury the user in dozens of unrelated charts
+or return a black-box score with no explanation. Poor Trader Dashboard is
+designed to turn public market data into a practical decision framework:
 
-- **One number you can act on.** The Poor2Rich score collapses every
-  indicator into one signed reading and a regime label, so you know in
-  seconds whether the market is closer to a bottom (a buying window) or a
-  top (a drawdown risk).
+- **Decision support, not blind automation.** The Poor2Rich score is an
+  evidence layer for trading decisions. It highlights whether the market
+  is closer to a bottom-risk/reward setup or a top/drawdown-risk setup,
+  while still leaving final judgment to the user.
+- **A focused indicator set.** The model uses a small group of indicators
+  with strong historical relationships to major US equity tops and
+  bottoms, instead of adding every available metric.
 - **Every input is auditable.** Every contribution to the score is
   itemised on screen, every indicator is plotted against its historical
   top / bottom thresholds, and every threshold was calibrated against
   the actual major US equity tops and bottoms since 2000.
-- **Price action and news, in one place.** Track your own watchlist,
-  see the global index landscape on the world map, and click any
-  significant move to read the headlines that drove it — no tab juggling.
-- **Free, fast, hosted.** No login, no install, no API key. Hourly
-  cron, edge-served, sub-second to load.
+- **Context around the score.** Watchlist performance, global index
+  movements, significant-move markers and news sit next to the model, so
+  users can verify whether the signal matches current market context.
+- **Free, fast, hosted.** No login, no install, no API key. The site is
+  edge-served, refreshed hourly, and available at `poortrader.com`.
 
 > A **Top** reading is treated as a *sell / take-profit* signal; a
 > **Bottom** reading is treated as a *buy / accumulate* signal. Every
@@ -40,13 +45,40 @@ designed to do both:
 > equity tops and bottoms since 2000 — see the in-app *History* section
 > on page 4 for the side-by-side numbers.
 
+## Signal Track Record
+
+Poor2Rich is still a research framework, but its signals are tracked as
+dated calls so the model can be judged against market outcomes rather
+than screenshots after the fact.
+
+### 2026-03-30 · Bottom Signal
+
+On **2026-03-30**, Poor2Rich generated a **Buy** regime with a
+**+6.40** composite score. The model identified a bottom-risk/reward
+setup because volatility, fear, breadth and momentum were all stretched
+toward capitulation at the same time.
+
+| Component | Latest reading used | Tier | Weight | Points |
+|---|---:|---:|---:|---:|
+| VIX | 30.61 | +2 | 1.5 | +3.00 |
+| Fear & Greed Index | 13.69 | +2 | 1.0 | +2.00 |
+| NDX > 20d MA | 18.81% | +1 | 1.0 | +1.00 |
+| AAII Bull-Bear | -21.60% | +1 | 0.7 | +0.70 |
+| S&P 500 RSI(14) | 27.72 | +1 | 0.7 | +0.70 |
+| 10Y-2Y Curve | +0.53% | -1 | 1.0 | -1.00 |
+| Other tracked indicators | Normal range | 0 | mixed | 0.00 |
+
+**Buy points:** +7.40  
+**Risk points:** -1.00  
+**Composite:** +6.40 (**Buy**)
+
 ## The Pages
 
 The site is organised into four numbered pages — clicking the
 **Poor Trader Dashboard** title in the header always returns to page 01.
 
 ### 01 · Prediction
-The home page and the heart of the product.
+The home page and the core of the system.
 
 - **Indicator Trends & Latest Values** — every indicator with its
   latest reading, formatted top/bottom flag, and source. Click any row
