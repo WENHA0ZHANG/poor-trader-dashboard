@@ -1,29 +1,97 @@
 # Poor Trader Dashboard
 
-A real-time dashboard that turns a curated set of macro, valuation and
-sentiment indicators into a compact decision panel for trading. It runs on
-Cloudflare Workers + Pages with a D1 (SQLite) backing store, exposes a
-small JSON API, and ships a single-page front end with charts, world map,
-indicator history, market regime composite, and a watchlist.
+**A live dashboard that calls market tops and bottoms with one number.**
 
-Live site: **https://poortrader.com/**
+Poor Trader Dashboard is an open, free-to-use market-timing tool that
+distills eleven of the most predictive macro, valuation and sentiment
+indicators into a single composite score — the **Poor2Rich score** — and
+classifies the US equity market into one of seven regimes, from *Strong
+Buy* through *Neutral* to *Strong Risk*.
+
+🌐 **Live: https://poortrader.com/**
+
+It runs entirely on Cloudflare Workers + Pages with a D1 (SQLite) backing
+store, refreshes hourly, and is built to be glanceable: open the page,
+see where the market sits, drill in if you want to.
+
+## Product Overview
+
+Most macro tools either bury the user in dozens of charts or hand back a
+single black-box score with no traceability. Poor Trader Dashboard is
+designed to do both:
+
+- **One number you can act on.** The Poor2Rich score collapses every
+  indicator into one signed reading and a regime label, so you know in
+  seconds whether the market is closer to a bottom (a buying window) or a
+  top (a drawdown risk).
+- **Every input is auditable.** Every contribution to the score is
+  itemised on screen, every indicator is plotted against its historical
+  top / bottom thresholds, and every threshold was calibrated against
+  the actual major US equity tops and bottoms since 2000.
+- **Price action and news, in one place.** Track your own watchlist,
+  see the global index landscape on the world map, and click any
+  significant move to read the headlines that drove it — no tab juggling.
+- **Free, fast, hosted.** No login, no install, no API key. Hourly
+  cron, edge-served, sub-second to load.
 
 > A **Top** reading is treated as a *sell / take-profit* signal; a
 > **Bottom** reading is treated as a *buy / accumulate* signal. Every
-> threshold below is derived from historical highs and lows around the
-> tops and bottoms after 2000 — see the *History* section in app.
+> threshold is derived from historical extremes around the major US
+> equity tops and bottoms since 2000 — see the in-app *History* section
+> on page 4 for the side-by-side numbers.
 
-## Why This Exists
+## The Pages
 
-We picked the small set of public indicators that have historically shown
-the **strongest correlation with major US equity tops and bottoms**, and
-wrote a single composite algorithm — the **Poor2Rich algorithm** —
-that fuses them into one score predicting potential buy windows and
-drawdown risks.
+The site is organised into four numbered pages — clicking the
+**Poor Trader Dashboard** title in the header always returns to page 01.
 
-The dashboard is intentionally compact: one screen, one regime score,
-clickable indicators with full history, contextual news, and a watchlist
-that can be reordered or sorted on the fly.
+### 01 · Prediction
+The home page and the heart of the product.
+
+- **Indicator Trends & Latest Values** — every indicator with its
+  latest reading, formatted top/bottom flag, and source. Click any row
+  to load its full history with threshold lines, shaded extreme zones,
+  and per-point colored hover markers.
+- **Market Regime — Composite View** — the live Poor2Rich score, the
+  active regime band, the cumulative *Buy / Caution / Risk* points, the
+  per-indicator contribution table, and the full band legend.
+
+### 02 · Market
+Performance and watchlist tracking.
+
+- **Indices**, **Other Assets** (gold, oil, BTC, USD, treasuries) and
+  **Stocks** tables — latest close plus 1W / 1M / 3M / 1Y change, with
+  sortable headers (descending → ascending → reset) on every period
+  column.
+- **Watchlist** — add or remove tickers, drag-and-drop to reorder, or
+  hit **T** to pin a ticker to the top. Selections persist in the
+  browser.
+- **Stock Detail** — click any stock to load its multi-range chart
+  (1M / 3M / 6M / 1Y / 2Y / 5Y / All) with biggest-move dots; click a
+  dot to read the news that day plus the most recent 30 days of
+  Finnhub headlines for the ticker.
+
+### 03 · Global Map & News
+The world view.
+
+- **Interactive global index map** — colored dots for the major US,
+  European, Developed-Asia and Emerging-Asia indices. Hover a country
+  for headlines, click to load its detail panel.
+- **Index Detail** — multi-range price chart with significant-move
+  pins; click a pin to expand its associated news.
+- **General market news feed** — fresh global headlines from Finnhub
+  to keep context next to the chart.
+
+### 04 · Signals & History
+Rules and historical reference.
+
+- **Bull / Bear Alerts** — the simplified per-indicator rules (≥ / ≤
+  thresholds) the dashboard uses to flag tops and bottoms, with their
+  rationale.
+- **Historical Comparison** — every major US equity top and bottom
+  since 2000 with the readings of HY OAS, AAII, F&G and PE at the
+  peak vs. the trough — the same database the thresholds are
+  calibrated against.
 
 ## Tracked Indicators
 
@@ -100,29 +168,27 @@ negative contributions push toward a **top / risk** bias.
 The regime card on the dashboard shows the active band, the cumulative
 buy/risk points, and which indicators drove each side.
 
-## Features
+## Platform Capabilities
 
-* **Indicator panel** — latest value with top/bottom highlighting; click
-  any row to see its full historical line chart with threshold lines,
-  shaded zones, and per-point colored markers (green/red/white).
-* **Market Regime composite** — Poor2Rich score, active band, indicator
-  contributions, and regime band legend.
-* **Bull/Bear alert table** — simplified per-indicator rules (≥ / ≤
-  thresholds) with rule descriptions.
-* **Watchlist (Stocks)** — searchable, addable, removable; sortable by
-  1W / 1M / 3M / 1Y change; drag-and-drop or **Top** button to reorder;
-  click any row to load its detail.
-* **Stock Detail panel** — 1M – 5Y chart, biggest-move dots that open
-  matching news, last 30 days of headlines (Finnhub).
-* **Global Market Map** — colored dots for major indices (US, Europe,
-  Developed Asia, Emerging Asia); hover for headlines, click to load
-  the index detail.
-* **Index Detail** — 1M / 3M / 6M / 1Y / 2Y / 5Y / All chart with
-  significant-move pins; click a pin for full per-day news.
-* **Historical comparison table** — major top/bottom events since 2000
-  with HY OAS, AAII, F&G, PE readings at peak vs. trough.
-* **Hourly cron** — D1 is refreshed every hour on the hour with a
-  heartbeat so the *Last Updated* timestamp keeps moving.
+Beyond the per-page content, the platform provides:
+
+* **Hourly refresh.** A Cloudflare cron pulls every source on the hour
+  and updates a heartbeat so the in-app *Last Updated* timestamp always
+  reflects the most recent run, even when no upstream value changed.
+* **On-demand refresh.** The header's **Update** button triggers an
+  out-of-cycle pull (rate-limited per IP) for users who want the
+  freshest snapshot without waiting for the next cron.
+* **Persistent personalisation.** Watchlist additions, deletions,
+  manual order, and column sort live in `localStorage` — your view is
+  remembered across visits.
+* **Mobile-friendly single page.** Tabbed navigation, no full-page
+  reloads, instant page switching, charts auto-resize.
+* **Open JSON API.** Every screen is backed by a public, no-auth REST
+  endpoint, so you can build your own bots, alerts or dashboards on top
+  (see the API table below).
+* **Edge-cached static, never-cached data.** The HTML / JS is served
+  from Cloudflare Pages; the data API explicitly opts out of every
+  cache layer so you never see a stale score.
 
 ## Architecture
 

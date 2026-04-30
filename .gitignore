@@ -1,21 +1,51 @@
-# Secrets
+# ── Secrets ────────────────────────────────────────────────────────────────────
 finnhub_key.txt
 .finnhub_key
 secrets/
+.env
+.env.*
+*.pem
+*.key
 
-# Python
+# Cloudflare Workers / Pages — local runtime state and account info.
+# wrangler-account.json contains your Cloudflare account ID + login email.
+.wrangler/
+**/wrangler-account.json
+.dev.vars
+.dev.vars.*
+.cloudflared/
+
+# ── Node ───────────────────────────────────────────────────────────────────────
+node_modules/
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── Python ─────────────────────────────────────────────────────────────────────
 __pycache__/
 *.pyc
 *.pyo
 .venv/
 venv/
-.env
 
-# OS / IDE
+# ── OS / IDE ───────────────────────────────────────────────────────────────────
 .DS_Store
 .idea/
 .vscode/
+Thumbs.db
 
-# SQLite WAL/SHM (keep main .sqlite3 if you want it tracked, ignore the side files)
+# ── Local databases (we don't ship the local SQLite stores) ────────────────────
+data.sqlite3
+trader_alerts.sqlite3
 *.sqlite3-shm
 *.sqlite3-wal
+*.sqlite3-journal
+
+# ── Build / packaging artifacts ────────────────────────────────────────────────
+trader.zip
+*.app/
+dist/
+build/
+*.tsbuildinfo
