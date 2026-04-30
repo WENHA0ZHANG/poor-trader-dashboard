@@ -542,6 +542,15 @@ def create_app(
             return s[:-3].upper()
         return s.upper() if s.isascii() else s
 
+    # Map Yahoo index symbols to their liquid ETF proxies so Finnhub
+    # /company-news returns relevant market headlines for indices too.
+    _INDEX_NEWS_PROXY: dict[str, str] = {
+        "^GSPC": "SPY",
+        "^DJI":  "DIA",
+        "^IXIC": "QQQ",
+        "^NDX":  "QQQ",
+    }
+
     def _is_us_equity_ticker(yahoo_sym: str) -> bool:
         """
         Heuristic: only call Finnhub /company-news for plain US-equity-style
@@ -554,6 +563,23 @@ def create_app(
         if any(c in s for c in ("^", "=", "-USD", "USD=")):
             return False
         return all(c.isalpha() or c == "-" or c.isdigit() for c in s)
+
+    def _news_ticker(yahoo_sym: str) -> str | None:
+        """
+        Return the ticker to query Finnhub /company-news for.
+        For plain US equities this is the symbol itself; for major US
+        indices we use their ETF proxy (SPY, DIA, QQQ).
+        Returns None if the symbol has no meaningful news source.
+        """
+        if not yahoo_sym:
+            return None
+        s = yahoo_sym.upper()
+        proxy = _INDEX_NEWS_PROXY.get(s)
+        if proxy:
+            return proxy
+        if _is_us_equity_ticker(s):
+            return s
+        return None
 
     @app.get("/api/stock-detail")
     def api_stock_detail(symbol: str, range: str = "1y") -> dict[str, Any]:
@@ -584,11 +610,12 @@ def create_app(
                     chg_pct = (latest_close - first) / first * 100.0
 
         articles: list[dict[str, Any]] = []
-        if news_is_enabled() and _is_us_equity_ticker(yh):
+        news_sym = _news_ticker(yh)
+        if news_is_enabled() and news_sym:
             try:
                 today = date.today()
                 from_d = today - timedelta(days=30)
-                articles = fetch_company_news(yh, from_d, today, db_path=resolved_db)
+                articles = fetch_company_news(news_sym, from_d, today, db_path=resolved_db)
             except Exception:
                 articles = []
             articles = articles[:8]
@@ -602,7 +629,7 @@ def create_app(
             "series": series,
             "news": articles,
             "news_enabled": news_is_enabled(),
-            "is_us_equity": _is_us_equity_ticker(yh),
+            "has_news": news_sym is not None,
         }
 
     @app.get("/api/latest")

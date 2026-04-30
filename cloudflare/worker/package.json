@@ -1,0 +1,15 @@
+{
+  "name": "poor-trader-worker",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "deploy:pages": "wrangler pages deploy ../pages --project-name poor-trader-dashboard"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250430.0",
+    "typescript": "^5.5.0",
+    "wrangler": "^3.90.0"
+  }
+}

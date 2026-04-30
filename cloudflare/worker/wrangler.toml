@@ -1,0 +1,27 @@
+name = "poor-trader-api"
+main = "src/index.ts"
+compatibility_date = "2026-04-30"
+compatibility_flags = ["nodejs_compat"]
+
+# ── D1 Database ────────────────────────────────────────────────────────────────
+# After running `wrangler d1 create poor-trader-db`, paste the returned
+# database_id here and replace the placeholder below.
+[[d1_databases]]
+binding = "DB"
+database_name = "poor-trader-db"
+database_id = "213c84ef-816a-45c3-8d17-8c55ba57fa16"
+
+# ── Cron Triggers ──────────────────────────────────────────────────────────────
+# Refresh macro indicators on the hour, every hour. The "Last Updated"
+# timestamp on the dashboard advances each run via the heartbeat written
+# in `setLastCronRun`.
+[triggers]
+crons = ["0 * * * *"]
+
+# ── Environment variables (non-secret) ────────────────────────────────────────
+[vars]
+ENVIRONMENT = "production"
+
+# Secrets (run `wrangler secret put FINNHUB_KEY` and `wrangler secret put FRED_API_KEY`):
+#   FINNHUB_KEY  – optional; enables news on stock detail + world map hover
+#   FRED_API_KEY – optional; enables FRED data for HY OAS + yield curve

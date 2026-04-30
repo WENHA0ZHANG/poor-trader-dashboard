@@ -355,15 +355,71 @@
         font-weight: 600;
       }
       .stock-controls button:hover { background: #ffffff; }
-      .stock-remove-btn {
+      .stock-remove-btn,
+      .stock-move-top-btn {
         border: none;
         background: transparent;
         color: var(--muted);
         cursor: pointer;
-        font-size: 14px;
         line-height: 1;
+        font-family: inherit;
+        font-weight: 600;
+        padding: 2px 4px;
+      }
+      .stock-remove-btn {
+        font-size: 15px;
       }
       .stock-remove-btn:hover { color: var(--bear); }
+      .stock-move-top-btn {
+        font-size: 11px;
+        border: 1px solid var(--border);
+        border-radius: 2px;
+        background: var(--panel2);
+        padding: 2px 6px;
+        transition: background 100ms ease, border-color 100ms ease, color 100ms ease;
+      }
+      .stock-move-top-btn:hover {
+        color: var(--accent);
+        border-color: rgba(96, 165, 250, 0.45);
+        background: rgba(96, 165, 250, 0.10);
+      }
+      .stock-row-actions {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        justify-content: flex-end;
+        /* Pull both controls inward so the scrollbar gutter doesn't cover
+           the X button in the Stocks card. */
+        padding-right: 6px;
+      }
+
+      /* Sortable header arrows (1W / 1M / 3M / 1Y). The two stacked
+         chevrons are dimmed by default; the active direction lights up. */
+      th.th-sortable { cursor: pointer; user-select: none; }
+      th.th-sortable:hover { color: var(--text-strong); }
+      th.th-sortable .th-sort-label {
+        display: inline-flex; align-items: center; gap: 4px;
+      }
+      th.th-sortable .th-sort-arrows {
+        display: inline-flex; flex-direction: column;
+        line-height: 0.85;
+        font-size: 7px;
+        color: #525252;
+      }
+      th.th-sortable.sort-desc .th-arrow-dn,
+      th.th-sortable.sort-asc  .th-arrow-up { color: var(--text-strong); }
+      th.th-sortable.sort-desc .th-arrow-up,
+      th.th-sortable.sort-asc  .th-arrow-dn { color: #2a2a2a; }
+
+      /* Drag-and-drop visual cues for stock rows. */
+      .stocks-card .market-row { transition: box-shadow 80ms ease, opacity 80ms ease; }
+      .stocks-card .market-row.dragging { opacity: 0.35; }
+      .stocks-card .market-row.drop-above {
+        box-shadow: inset 0 2px 0 0 var(--accent);
+      }
+      .stocks-card .market-row.drop-below {
+        box-shadow: inset 0 -2px 0 0 var(--accent);
+      }
       table { width: 100%; border-collapse: collapse; }
       th, td {
         padding: 10px 14px;
@@ -526,19 +582,47 @@
       }
 
       /* ===== Page 2 Market layout (tables LEFT, detail RIGHT, 50/50) ===== */
-      .grid-market { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
+      .grid-market { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: stretch; }
       @media (min-width: 1100px) {
         .grid-market { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
       }
-      .market-tables { display: flex; flex-direction: column; gap: 12px; }
+      .market-tables {
+        display: flex; flex-direction: column; gap: 12px;
+        min-height: 0;
+      }
       .market-tables tr.market-row { cursor: pointer; }
       .market-tables tr.market-row:hover { background: rgba(255,255,255,0.04); }
       .market-tables tr.market-row.active {
         background: rgba(229, 229, 229, 0.08);
         outline: 1px solid var(--text-strong);
       }
+      /* The Stocks mini-card stretches to fill the leftover height so its
+         bottom aligns with the right-side detail card. The table body
+         scrolls when there are more rows than will fit. */
+      .market-tables .card.stocks-card {
+        flex: 1 1 0;
+        min-height: 280px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .stocks-card .stocks-table-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        scrollbar-gutter: stable;
+      }
+      .stocks-card .stocks-table-wrap thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: #0a0a0a;
+      }
 
-      .stock-detail-card { position: sticky; top: 12px; }
+      /* Sticky detail card on the right column. align-self: start keeps it
+         glued to the top of the row (it won't stretch) so the left stocks
+         card can flex-grow to align bottoms. */
+      .stock-detail-card { position: sticky; top: 12px; align-self: start; }
       .stock-detail-card .stock-detail-empty {
         padding: 36px 24px; text-align: center;
         color: var(--muted); font-size: 13px;
@@ -745,9 +829,9 @@
       <div class="top">
         <h1>Poor Trader Dashboard <span class="accent">Macro &amp; Sentiment</span></h1>
         <div class="meta">
-          Last Updated: {{ last_update_time or 'Never Updated' }}
+          Last Updated: <span id="last-update-time">Loading...</span>
           &nbsp;|&nbsp;
-          <a href="/?refresh=1">Update</a>
+          <a href="#" id="global-refresh-btn" onclick="globalRefresh(); return false;">Update</a>
         </div>
       </div>
 
@@ -800,63 +884,11 @@
               </tr>
             </thead>
             <tbody>
-              {% for r in latest_rows %}
-              <tr class="indicator-row" data-indicator-id="{{ r.id }}" data-indicator-name="{{ r.name }}" style="{% if r.is_top %}background-color: var(--bear-soft); border-left: 3px solid var(--bear);{% elif r.is_bottom %}background-color: var(--bull-soft); border-left: 3px solid var(--bull);{% else %}border-left: 3px solid transparent;{% endif %}">
-                <td>{{ r.name }}</td>
-                <td>{{ r.as_of or "—" }}</td>
-                <td style="{% if r.is_top %}color: var(--bear); font-weight: 600;{% elif r.is_bottom %}color: var(--bull); font-weight: 600;{% else %}color: var(--muted);{% endif %}">{{ r.value if r.value is not none else "—" }}</td>
-                <td style="white-space: nowrap;">{% if r.source_url %}<a href="{{ r.source_url }}" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none;">{{ r.source or "—" }}</a>{% else %}{{ r.source or "—" }}{% endif %}</td>
-              </tr>
-              {% endfor %}
+              <tr id="indicator-loading-row"><td colspan="4" class="meta">Loading indicators...</td></tr>
             </tbody>
           </table>
         </div>
-
-        {% if regime %}
-        <div class="regime-card {{ regime.css_class }}">
-          <div class="regime-headline">
-            <div class="regime-eyebrow">Market Regime · Composite View</div>
-            <div class="regime-label">{{ regime.label }}</div>
-            <div class="regime-meter">
-              <div class="regime-score">{{ "%+.1f" % regime.score }}</div>
-              <div class="regime-pts">
-                <span class="buy">+{{ "%.1f" % regime.buy_points }} buy</span> &nbsp;/&nbsp;
-                <span class="risk">−{{ "%.1f" % regime.risk_points }} risk</span><br>
-                <span style="color: var(--muted);">{{ regime.coverage }}/{{ regime.total }} indicators triggered</span>
-              </div>
-            </div>
-          </div>
-          <div class="regime-bands-table">
-            {% set _band_rows = [
-              ('regime-strong-buy',   'Strong Buy',   '≥ +9.0',      'buy-strong'),
-              ('regime-buy',          'Buy',          '+4.5 – +9.0', 'buy-mid'),
-              ('regime-cautious-buy', 'Cautious Buy', '+1.5 – +4.5', 'buy-soft'),
-              ('regime-neutral',      'Neutral',      '−1.5 – +1.5', 'neutral'),
-              ('regime-caution',      'Caution',      '−4.5 – −1.5', 'risk-soft'),
-              ('regime-risk',         'Risk',         '−9.0 – −4.5', 'risk-mid'),
-              ('regime-strong-risk',  'Strong Risk',  '≤ −9.0',      'risk-strong'),
-            ] %}
-            {% for row_class, label, range_text, swatch in _band_rows %}
-              <div class="band-row {{ swatch }}{% if row_class == regime.css_class %} active{% endif %}">
-                <span class="band-dot"></span>
-                <span class="band-label">{{ label }}</span>
-                <span class="band-range">{{ range_text }}</span>
-              </div>
-            {% endfor %}
-          </div>
-          <div class="regime-contribs">
-            <div class="regime-eyebrow" style="margin-bottom: 6px;">Indicator Contributions</div>
-            {% for c in regime.contributions %}
-              {% set pts_class = 'buy' if c.points > 0 else ('risk' if c.points < 0 else 'neutral') %}
-              <div class="row">
-                <span class="pts {{ pts_class }}">{{ "%+.1f" % c.points }}</span>
-                <span class="name">{{ c.title }}</span>
-                <span class="reason">{{ c.reason }}</span>
-              </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
+        <div id="regime-container"></div>
       </div>
       </section>
 
@@ -865,78 +897,74 @@
       <div class="grid-market">
         <div class="market-tables">
           <div class="card mini-card">
-            <h2>US Market Indices <a href="#" onclick="loadMarketOverview(); return false;">Update</a></h2>
-            <table>
+            <h2>US Market Indices <a href="#" onclick="loadMarketOverview(true); return false;">Reload</a></h2>
+            <table data-table-key="indices">
               <thead>
                 <tr>
                   <th style="width: 18%">Name</th>
                   <th style="width: 18%">Date</th>
                   <th style="width: 18%">Latest</th>
-                  <th style="width: 11.5%">1W</th>
-                  <th style="width: 11.5%">1M</th>
-                  <th style="width: 11.5%">3M</th>
-                  <th style="width: 11.5%">1Y</th>
+                  <th style="width: 11.5%" class="th-sortable" data-sort-col="chg_1w_pct"><span class="th-sort-label">1W <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                  <th style="width: 11.5%" class="th-sortable" data-sort-col="chg_1m_pct"><span class="th-sort-label">1M <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                  <th style="width: 11.5%" class="th-sortable" data-sort-col="chg_3m_pct"><span class="th-sort-label">3M <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                  <th style="width: 11.5%" class="th-sortable" data-sort-col="chg_1y_pct"><span class="th-sort-label">1Y <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
                 </tr>
               </thead>
               <tbody id="market-body-indices">
-                {% if (market_rows is none) or (market_rows|length == 0) %}
                 <tr id="market-loading-row-indices">
-                  <td colspan="7" class="meta">Loading... (this section loads asynchronously after page load)</td>
+                  <td colspan="7" class="meta">Loading...</td>
                 </tr>
-                {% endif %}
               </tbody>
             </table>
           </div>
           <div class="card mini-card">
-            <h2>Futures & Crypto <a href="#" onclick="loadMarketOverview(); return false;">Update</a></h2>
-            <table>
+            <h2>Futures &amp; Crypto <a href="#" onclick="loadMarketOverview(true); return false;">Reload</a></h2>
+            <table data-table-key="assets">
               <thead>
                 <tr>
                   <th style="width: 18%">Name</th>
                   <th style="width: 18%">Date</th>
                   <th style="width: 18%">Latest</th>
-                  <th style="width: 11.5%">1W</th>
-                  <th style="width: 11.5%">1M</th>
-                  <th style="width: 11.5%">3M</th>
-                  <th style="width: 11.5%">1Y</th>
+                  <th style="width: 11.5%" class="th-sortable" data-sort-col="chg_1w_pct"><span class="th-sort-label">1W <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                  <th style="width: 11.5%" class="th-sortable" data-sort-col="chg_1m_pct"><span class="th-sort-label">1M <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                  <th style="width: 11.5%" class="th-sortable" data-sort-col="chg_3m_pct"><span class="th-sort-label">3M <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                  <th style="width: 11.5%" class="th-sortable" data-sort-col="chg_1y_pct"><span class="th-sort-label">1Y <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
                 </tr>
               </thead>
               <tbody id="market-body-assets">
-                {% if (market_rows is none) or (market_rows|length == 0) %}
                 <tr id="market-loading-row-assets">
-                  <td colspan="7" class="meta">Loading... (this section loads asynchronously after page load)</td>
+                  <td colspan="7" class="meta">Loading...</td>
                 </tr>
-                {% endif %}
               </tbody>
             </table>
           </div>
-          <div class="card mini-card">
-            <h2>Stocks <a href="#" onclick="loadMarketOverview(); return false;">Update</a></h2>
+          <div class="card mini-card stocks-card">
+            <h2>Stocks <a href="#" onclick="loadMarketOverview(true); return false;">Reload</a></h2>
             <div class="stock-controls">
               <input id="stock-search-input" type="text" placeholder="Search/add ticker (e.g., AAPL)" />
               <button id="stock-add-btn" type="button">Add</button>
             </div>
-            <table>
-              <thead>
-                <tr>
-                  <th style="width: 18%">Name</th>
-                  <th style="width: 18%">Date</th>
-                  <th style="width: 18%">Latest</th>
-                  <th style="width: 11.5%">1W</th>
-                  <th style="width: 11.5%">1M</th>
-                  <th style="width: 11.5%">3M</th>
-                  <th style="width: 11.5%">1Y</th>
-                  <th style="width: 4%"></th>
-                </tr>
-              </thead>
-              <tbody id="market-body-stocks">
-                {% if (market_rows is none) or (market_rows|length == 0) %}
-                <tr id="market-loading-row-stocks">
-                  <td colspan="8" class="meta">Loading... (this section loads asynchronously after page load)</td>
-                </tr>
-                {% endif %}
-              </tbody>
-            </table>
+            <div class="stocks-table-wrap">
+              <table data-table-key="stocks">
+                <thead>
+                  <tr>
+                    <th style="width: 16%">Name</th>
+                    <th style="width: 12%">Date</th>
+                    <th style="width: 13%">Latest</th>
+                    <th style="width: 10%" class="th-sortable" data-sort-col="chg_1w_pct"><span class="th-sort-label">1W <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                    <th style="width: 10%" class="th-sortable" data-sort-col="chg_1m_pct"><span class="th-sort-label">1M <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                    <th style="width: 10%" class="th-sortable" data-sort-col="chg_3m_pct"><span class="th-sort-label">3M <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                    <th style="width: 10%" class="th-sortable" data-sort-col="chg_1y_pct"><span class="th-sort-label">1Y <span class="th-sort-arrows"><span class="th-arrow-up">▲</span><span class="th-arrow-dn">▼</span></span></span></th>
+                    <th style="width: 19%; padding-right: 16px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="market-body-stocks">
+                  <tr id="market-loading-row-stocks">
+                    <td colspan="8" class="meta">Loading...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
@@ -983,7 +1011,7 @@
               <button id="map-zoom-in" type="button" title="Zoom in">+</button>
               <button id="map-reset" type="button" title="Reset view">Reset</button>
             </span>
-            <a href="#" onclick="loadWorldIndices(true); return false;" style="margin-left: 8px;">Update</a>
+            <a href="#" onclick="loadWorldIndices(true); return false;" style="margin-left: 8px;">Reload</a>
           </h2>
           <div id="world-news-warning" class="news-warning" style="display:none;">
             FINNHUB_KEY is not configured. Set the env var and restart to enable hover news. Prices are still live.
@@ -1003,7 +1031,11 @@
             <span id="index-detail-title">Index Detail &mdash; click a country on the map</span>
             <span class="index-detail-controls" id="index-detail-controls" style="margin-left: 12px;">
               <button data-range="1m">1M</button>
+              <button data-range="3m">3M</button>
+              <button data-range="6m">6M</button>
               <button data-range="1y" class="active">1Y</button>
+              <button data-range="2y">2Y</button>
+              <button data-range="5y">5Y</button>
               <button data-range="all">All</button>
             </span>
             <span id="index-detail-meta" class="meta" style="margin-left: 8px;"></span>
@@ -1071,11 +1103,11 @@
           <div style="display:flex; gap:12px; padding: 12px 14px; flex-wrap: wrap;">
             <div>
               <span class="pill bear">Top Signals</span>
-              <span class="meta">Count: <code>{{ top_score }}</code></span>
+              <span class="meta">Count: <code><span id="top-score">—</span></code></span>
             </div>
             <div>
               <span class="pill bull">Bottom Signals</span>
-              <span class="meta">Count: <code>{{ bottom_score }}</code></span>
+              <span class="meta">Count: <code><span id="bottom-score">—</span></code></span>
             </div>
           </div>
 
@@ -1090,15 +1122,7 @@
               </tr>
             </thead>
             <tbody>
-              {% for s in signals %}
-              <tr>
-                <td style="text-align: center;">{{ loop.index }}</td>
-                <td>{{ s.title }}</td>
-                <td>{% if s.top %}<span class="pill bear">Top</span>{% else %}<span class="pill neutral">—</span>{% endif %}</td>
-                <td>{% if s.bottom %}<span class="pill bull">Bottom</span>{% else %}<span class="pill neutral">—</span>{% endif %}</td>
-                <td class="meta">{{ s.detail }}</td>
-              </tr>
-              {% endfor %}
+              <tr id="signals-loading-row"><td colspan="5" class="meta">Loading signals...</td></tr>
             </tbody>
           </table>
           <div class="empty">Note: Signals are "early warning/emotional and credit temperature gauges", not trading orders; please combine with position management and risk control.</div>
@@ -1107,7 +1131,7 @@
 
 
       <div class="card" style="margin-top: 14px;">
-        <h2>History: Major Top/Bottom Comparisons After 2000 (Based on ^SPX Drawdown >= 15%)</h2>
+        <h2>History: Major Top/Bottom Comparisons After 2000 (Based on ^SPX Drawdown ≥ 15%)</h2>
         <table>
           <thead>
             <tr>
@@ -1122,18 +1146,14 @@
             </tr>
           </thead>
           <tbody>
-            {% for r in bear_rows %}
-            <tr>
-              <td>{{ r.event_name }}</td>
-              <td style="text-align: center;">{{ r.peak_date }}</td>
-              <td style="text-align: center;">{{ r.trough_date }}</td>
-              <td style="color: var(--bear); font-weight: bold; text-align: center;">{{ r.drawdown_pct }}%</td>
-              <td style="text-align: center;">{{ (r.peak_hy ~ "%") if r.peak_hy else "—" }} / {{ (r.trough_hy ~ "%") if r.trough_hy else "—" }}</td>
-              <td style="text-align: center;">{{ (r.peak_aaii ~ "%") if r.peak_aaii else "—" }} / {{ (r.trough_aaii ~ "%") if r.trough_aaii else "—" }}</td>
-              <td style="text-align: center;">{{ r.peak_cnn if r.peak_cnn else "—" }} / {{ r.trough_cnn if r.trough_cnn else "—" }}</td>
-              <td style="text-align: center;">{{ (r.peak_pe ~ "x") if r.peak_pe else "—" }} / {{ (r.trough_pe ~ "x") if r.trough_pe else "—" }}</td>
-            </tr>
-            {% endfor %}
+              <tr><td>Dot-com Bubble Burst</td><td style="text-align:center">2000-03-24</td><td style="text-align:center">2002-10-09</td><td style="color:var(--bear);font-weight:bold;text-align:center">-49.1%</td><td style="text-align:center">3.78% / 10.97%</td><td style="text-align:center">25.0% / -25.0%</td><td style="text-align:center">— / —</td><td style="text-align:center">28.0x / 32.0x</td></tr>
+              <tr><td>2008 Global Financial Crisis</td><td style="text-align:center">2007-10-09</td><td style="text-align:center">2009-03-09</td><td style="color:var(--bear);font-weight:bold;text-align:center">-56.8%</td><td style="text-align:center">3.78% / 19.66%</td><td style="text-align:center">23.0% / -51.0%</td><td style="text-align:center">— / —</td><td style="text-align:center">22.0x / 110.0x</td></tr>
+              <tr><td>2011 US Debt Ceiling / Eurozone Crisis</td><td style="text-align:center">2011-04-29</td><td style="text-align:center">2011-10-03</td><td style="color:var(--bear);font-weight:bold;text-align:center">-19.4%</td><td style="text-align:center">4.39% / 8.87%</td><td style="text-align:center">12.0% / -25.0%</td><td style="text-align:center">— / —</td><td style="text-align:center">16.0x / 13.0x</td></tr>
+              <tr><td>2018 Q4 Trade War / Fed Tightening</td><td style="text-align:center">2018-09-20</td><td style="text-align:center">2018-12-24</td><td style="color:var(--bear);font-weight:bold;text-align:center">-19.8%</td><td style="text-align:center">3.16% / 5.34%</td><td style="text-align:center">23.0% / -29.0%</td><td style="text-align:center">80.0 / 3.0</td><td style="text-align:center">21.0x / 17.5x</td></tr>
+              <tr><td>2020 COVID-19 Crash</td><td style="text-align:center">2020-02-19</td><td style="text-align:center">2020-03-23</td><td style="color:var(--bear);font-weight:bold;text-align:center">-33.9%</td><td style="text-align:center">3.59% / 10.87%</td><td style="text-align:center">13.0% / -20.0%</td><td style="text-align:center">58.0 / 3.0</td><td style="text-align:center">25.0x / 19.0x</td></tr>
+              <tr><td>2022 Inflation / Rate Hike Bear</td><td style="text-align:center">2022-01-03</td><td style="text-align:center">2022-10-12</td><td style="color:var(--bear);font-weight:bold;text-align:center">-25.4%</td><td style="text-align:center">3.05% / 5.23%</td><td style="text-align:center">-6.0% / -35.0%</td><td style="text-align:center">52.0 / 17.0</td><td style="text-align:center">28.0x / 19.0x</td></tr>
+              <tr><td>2024.08 Yen Carry Trade Unwind</td><td style="text-align:center">2024-07-16</td><td style="text-align:center">2024-08-05</td><td style="color:var(--bear);font-weight:bold;text-align:center">-8.5%</td><td style="text-align:center">3.05% / 3.81%</td><td style="text-align:center">30.0% / -5.0%</td><td style="text-align:center">56.0 / 25.0</td><td style="text-align:center">28.5x / 26.0x</td></tr>
+              <tr><td>2025.04 Tariff Shock</td><td style="text-align:center">2025-02-19</td><td style="text-align:center">2025-04-08</td><td style="color:var(--bear);font-weight:bold;text-align:center">-18.9%</td><td style="text-align:center">2.84% / 4.61%</td><td style="text-align:center">-12.0% / -38.0%</td><td style="text-align:center">50.0 / 4.0</td><td style="text-align:center">30.0x / 23.0x</td></tr>
           </tbody>
         </table>
         <div class="empty">Note: Historical comparison table is a hardcoded snapshot (for comparison and rule backtesting), data compiled from Federal Reserve FRED (HY Spread), AAII (Sentiment), CNN (Fear & Greed), Multpl (SP500 PE). CNN data not available before 2012.</div>
@@ -1141,43 +1161,7 @@
       </section>
 
       <div class="footer">
-        {% if fetch_ok and fetch_ok|length > 0 %}
-          <div style="margin-bottom:8px; color: var(--bull);">
-            Fetch Success: {{ fetch_ok | join("; ") }}
-          </div>
-        {% endif %}
-        {% if fetch_err and fetch_err|length > 0 %}
-          <div style="margin-bottom:8px; color: var(--bear);">
-            Fetch Failed: {{ fetch_err | join("; ") }}
-          </div>
-        {% endif %}
-
-        Note: Run <code>trader ingest</code> or <code>trader fetch</code> to write data first, then refresh the page.
-        API: <a href="/api/latest">/api/latest</a> / <a href="/api/alerts">/api/alerts</a>
-        <div style="margin-top:6px;">
-          Auto Fetch: <code>{{ "On" if auto_fetch_enabled else "Off" }}</code>
-          <button onclick="toggleAutoFetch()" style="margin-left:10px; padding:2px 8px; font-size:11px;">
-            {{ "Turn Off" if auto_fetch_enabled else "Turn On" }}
-          </button>     Providers: <code>{{ auto_fetch_providers | join(",") }}</code>;
-          Cooldown: <code>{{ cooldown_seconds }}s</code>
-        </div>
-
-        <script>
-        function toggleAutoFetch() {
-            fetch('/api/toggle-autofetch', { method: 'POST' })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        location.reload(); // Refresh page to show new state
-                    } else {
-                        alert('Failed to toggle auto-fetch: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    alert('Error: ' + error.message);
-                });
-        }
-        </script>
+        <div id="fetch-status"></div>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
         <script>
@@ -1220,6 +1204,29 @@
           }
           return idx;
         }
+
+        // Dashed vertical line follows the tooltip x-position, mirroring
+        // the axisPointer in the ECharts market chart.
+        const verticalLinePlugin = {
+          id: "verticalLine",
+          afterDraw(chart) {
+            const tooltip = chart.tooltip;
+            if (!tooltip || !tooltip._active || !tooltip._active.length) return;
+            const active = tooltip._active.find(a => a.datasetIndex === 0) || tooltip._active[0];
+            if (!active || !active.element) return;
+            const { ctx, chartArea } = chart;
+            const x = active.element.x;
+            ctx.save();
+            ctx.beginPath();
+            ctx.setLineDash([4, 4]);
+            ctx.moveTo(x, chartArea.top);
+            ctx.lineTo(x, chartArea.bottom);
+            ctx.lineWidth = 1;
+            ctx.strokeStyle = "rgba(229, 229, 229, 0.45)";
+            ctx.stroke();
+            ctx.restore();
+          },
+        };
 
         const thresholdLabelPlugin = {
           id: "thresholdLabels",
@@ -1380,6 +1387,27 @@
           if (Number.isNaN(n)) return "";
           return (n >= 0 ? "color: var(--bull);" : "color: var(--bear);") + "font-weight: 600;";
         }
+        // Per-table sort state. Cycles null → desc → asc → null on each click.
+        const _tableSortState = { indices: null, assets: null, stocks: null };
+
+        function _sortRows(rows, state) {
+          if (!state || !state.col || !state.dir) return rows.slice();
+          const col = state.col;
+          const dir = state.dir;
+          const decorated = rows.map((r, i) => {
+            const v = r[col];
+            const isNum = typeof v === "number" && !Number.isNaN(v);
+            return { r, i, v: isNum ? v : null };
+          });
+          decorated.sort((a, b) => {
+            if (a.v === null && b.v === null) return a.i - b.i;
+            if (a.v === null) return 1;
+            if (b.v === null) return -1;
+            return dir === "desc" ? b.v - a.v : a.v - b.v;
+          });
+          return decorated.map((d) => d.r);
+        }
+
         function _renderMarketTable(tbody, rows, opts = {}) {
           if (!tbody) return;
           const loading = tbody.querySelector("tr[id^='market-loading-row']");
@@ -1395,7 +1423,13 @@
             tbody.appendChild(tr);
             return;
           }
-          for (const r of rows) {
+
+          // Apply this table's current sort (if any) before rendering rows.
+          const tableKey = opts.tableKey || null;
+          const sortState = tableKey ? _tableSortState[tableKey] : null;
+          const displayRows = _sortRows(rows, sortState);
+
+          for (const r of displayRows) {
             const tr = document.createElement("tr");
             tr.className = "market-row";
             const symKey = String(r.symbol || r.name || "");
@@ -1404,9 +1438,12 @@
             if (currentStockSymbol && symKey.toLowerCase() === String(currentStockSymbol).toLowerCase()) {
               tr.classList.add("active");
             }
+            const dateDisplay = r.as_of && /^\d{4}-\d{2}-\d{2}/.test(r.as_of)
+              ? r.as_of.slice(5)
+              : (r.as_of ?? "—");
             tr.innerHTML = `
               <td>${r.name ?? "—"}</td>
-              <td>${r.as_of ?? "—"}</td>
+              <td>${dateDisplay}</td>
               <td style="font-weight:700;">${(r.close !== null && r.close !== undefined) ? Number(r.close).toFixed(2) : "—"}</td>
               <td style="${_pctStyle(r.chg_1w_pct)}">${_fmtPct(r.chg_1w_pct)}</td>
               <td style="${_pctStyle(r.chg_1m_pct)}">${_fmtPct(r.chg_1m_pct)}</td>
@@ -1417,13 +1454,33 @@
               loadStockDetail(symKey, r.name || symKey);
             });
             if (opts.withDelete) {
+              const tickerName = normalizeTicker(r.name || r.symbol || "") || String(r.name || "");
+              tr.dataset.ticker = tickerName;
+              tr.draggable = true;
+              _attachDragHandlers(tr);
+
               const td = document.createElement("td");
               td.style.textAlign = "right";
-              const btn = document.createElement("button");
-              btn.className = "stock-remove-btn";
-              btn.type = "button";
-              btn.textContent = "×";
-              btn.addEventListener("click", (ev) => {
+              td.style.paddingRight = "16px";
+              const actions = document.createElement("span");
+              actions.className = "stock-row-actions";
+
+              const moveBtn = document.createElement("button");
+              moveBtn.className = "stock-move-top-btn";
+              moveBtn.type = "button";
+              moveBtn.title = "Move to top";
+              moveBtn.textContent = "T";
+              moveBtn.addEventListener("click", (ev) => {
+                ev.stopPropagation();
+                if (tickerName) moveStockToTop(tickerName);
+              });
+
+              const delBtn = document.createElement("button");
+              delBtn.className = "stock-remove-btn";
+              delBtn.type = "button";
+              delBtn.title = "Remove";
+              delBtn.textContent = "×";
+              delBtn.addEventListener("click", (ev) => {
                 ev.stopPropagation();
                 const sym = normalizeTicker(r.symbol || r.name || "");
                 if (!sym) return;
@@ -1436,9 +1493,14 @@
                   hidden.add(sym);
                   saveHiddenStocks(Array.from(hidden));
                 }
+                // Drop the symbol from the manual order too.
+                saveStockOrder(getStockOrder().filter((s) => s.toUpperCase() !== sym.toUpperCase()));
                 loadMarketOverview();
               });
-              td.appendChild(btn);
+
+              actions.appendChild(moveBtn);
+              actions.appendChild(delBtn);
+              td.appendChild(actions);
               tr.appendChild(td);
             }
             tbody.appendChild(tr);
@@ -1468,7 +1530,10 @@
             { symbol: "xagusd", name: "XAG" },
           ];
 
-          const defaultStocks = ["BRK-B", "KO", "RKLB", "AMZN"];
+          const defaultStocks = [
+            "NVO", "AAPL", "GOOG", "NVDA", "TSLA", "META", "MSFT", "HOOD", "MU",
+            "BRK-B", "RKLB", "AMZN", "KO", "ZETA", "Q", "SOLS",
+          ];
           const customStocks = getCustomStocks();
           const hidden = new Set(getHiddenStocks().map(s => s.toLowerCase()));
           const stockList = [];
@@ -1481,15 +1546,165 @@
 
           const indices = indexList.map(it => rowMap.get(it.symbol) || { name: it.name, symbol: it.symbol });
           const assets = assetList.map(it => rowMap.get(it.symbol) || { name: it.name, symbol: it.symbol });
-          const stocks = stockList.map(it => rowMap.get(it.symbol) || { name: it.name, symbol: it.symbol });
+          let stocks = stockList.map(it => rowMap.get(it.symbol) || { name: it.name, symbol: it.symbol });
+          stocks = _applyStockOrder(stocks);
 
-          _renderMarketTable(tbodyIndices, indices);
-          _renderMarketTable(tbodyAssets, assets);
-          _renderMarketTable(tbodyStocks, stocks, { withDelete: true });
+          _renderMarketTable(tbodyIndices, indices, { tableKey: "indices" });
+          _renderMarketTable(tbodyAssets, assets,   { tableKey: "assets" });
+          _renderMarketTable(tbodyStocks, stocks,   { tableKey: "stocks", withDelete: true });
+
+          _refreshSortHeaders();
+        }
+
+        // Apply the user's saved manual order to the stock list. Tickers that
+        // appear in `stockOrder` are rendered first in that order, then any
+        // remaining tickers follow in their original (default + custom) order.
+        function _applyStockOrder(stocks) {
+          const order = getStockOrder();
+          if (!order.length) return stocks;
+          const byName = new Map();
+          for (const s of stocks) byName.set(String(s.name || "").toUpperCase(), s);
+          const out = [];
+          const placed = new Set();
+          for (const t of order) {
+            const u = String(t).toUpperCase();
+            if (byName.has(u) && !placed.has(u)) {
+              out.push(byName.get(u));
+              placed.add(u);
+            }
+          }
+          for (const s of stocks) {
+            const u = String(s.name || "").toUpperCase();
+            if (!placed.has(u)) out.push(s);
+          }
+          return out;
+        }
+
+        function _refreshSortHeaders() {
+          document.querySelectorAll("table[data-table-key]").forEach((tbl) => {
+            const key = tbl.getAttribute("data-table-key");
+            const state = _tableSortState[key];
+            tbl.querySelectorAll("th.th-sortable").forEach((th) => {
+              th.classList.remove("sort-desc", "sort-asc");
+              if (state && state.col === th.dataset.sortCol) {
+                th.classList.add(state.dir === "desc" ? "sort-desc" : "sort-asc");
+              }
+            });
+          });
+        }
+
+        function _initSortableHeaders() {
+          document.querySelectorAll("table[data-table-key] th.th-sortable").forEach((th) => {
+            th.addEventListener("click", () => {
+              const tbl = th.closest("table[data-table-key]");
+              const key = tbl?.getAttribute("data-table-key");
+              if (!key) return;
+              const col = th.dataset.sortCol;
+              const cur = _tableSortState[key];
+              let next;
+              if (!cur || cur.col !== col)        next = { col, dir: "desc" };
+              else if (cur.dir === "desc")        next = { col, dir: "asc" };
+              else                                next = null;
+              _tableSortState[key] = next;
+              const cached = getMarketCache();
+              if (cached) renderMarketRows(cached);
+            });
+          });
+        }
+
+        // Move a single ticker to position 0 of the manually saved order.
+        function moveStockToTop(ticker) {
+          const t = String(ticker || "").toUpperCase();
+          if (!t) return;
+          // Use the currently rendered list (in display order) as the base so
+          // that the explicit ordering reflects what the user can see.
+          const tbody = document.getElementById("market-body-stocks");
+          if (!tbody) return;
+          const current = Array.from(tbody.querySelectorAll("tr.market-row"))
+            .map((tr) => String(tr.dataset.ticker || tr.dataset.name || "").toUpperCase())
+            .filter(Boolean);
+          const filtered = current.filter((s) => s !== t);
+          filtered.unshift(t);
+          saveStockOrder(filtered);
+          // Clear the stocks-table sort so the manual order is what shows.
+          _tableSortState.stocks = null;
+          const cached = getMarketCache();
+          if (cached) renderMarketRows(cached);
+        }
+
+        // Drag-and-drop reordering for stock rows. Uses the native HTML5
+        // drag API, with visual indicators on the drop target's edge.
+        let _dragSrcTicker = null;
+        function _attachDragHandlers(tr) {
+          tr.addEventListener("dragstart", (ev) => {
+            _dragSrcTicker = String(tr.dataset.ticker || tr.dataset.name || "").toUpperCase();
+            tr.classList.add("dragging");
+            try { ev.dataTransfer.setData("text/plain", _dragSrcTicker); } catch { /* noop */ }
+            ev.dataTransfer.effectAllowed = "move";
+          });
+          tr.addEventListener("dragend", () => {
+            tr.classList.remove("dragging");
+            document.querySelectorAll(".market-row.drop-above, .market-row.drop-below")
+              .forEach((r) => r.classList.remove("drop-above", "drop-below"));
+            _dragSrcTicker = null;
+          });
+          tr.addEventListener("dragover", (ev) => {
+            if (!_dragSrcTicker) return;
+            ev.preventDefault();
+            ev.dataTransfer.dropEffect = "move";
+            const rect = tr.getBoundingClientRect();
+            const above = (ev.clientY - rect.top) < rect.height / 2;
+            tr.classList.toggle("drop-above", above);
+            tr.classList.toggle("drop-below", !above);
+          });
+          tr.addEventListener("dragleave", () => {
+            tr.classList.remove("drop-above", "drop-below");
+          });
+          tr.addEventListener("drop", (ev) => {
+            ev.preventDefault();
+            const src = _dragSrcTicker;
+            const tgt = String(tr.dataset.ticker || tr.dataset.name || "").toUpperCase();
+            const above = tr.classList.contains("drop-above");
+            tr.classList.remove("drop-above", "drop-below");
+            if (!src || !tgt || src === tgt) return;
+            _commitDragReorder(src, tgt, above ? "before" : "after");
+          });
+        }
+
+        function _commitDragReorder(srcTicker, tgtTicker, position) {
+          const tbody = document.getElementById("market-body-stocks");
+          if (!tbody) return;
+          const order = Array.from(tbody.querySelectorAll("tr.market-row"))
+            .map((r) => String(r.dataset.ticker || r.dataset.name || "").toUpperCase())
+            .filter(Boolean);
+          const filtered = order.filter((s) => s !== srcTicker);
+          let i = filtered.indexOf(tgtTicker);
+          if (i < 0) i = filtered.length;
+          if (position === "after") i += 1;
+          filtered.splice(i, 0, srcTicker);
+          saveStockOrder(filtered);
+          _tableSortState.stocks = null;
+          const cached = getMarketCache();
+          if (cached) renderMarketRows(cached);
         }
         const STOCK_STORAGE_KEY = "market.customStocks";
         const STOCK_HIDDEN_KEY = "market.hiddenStocks";
+        const STOCK_ORDER_KEY = "market.stockOrder";
         const MARKET_CACHE_KEY = "market.overview.cache";
+
+        function getStockOrder() {
+          try {
+            const raw = localStorage.getItem(STOCK_ORDER_KEY);
+            const arr = raw ? JSON.parse(raw) : [];
+            return Array.isArray(arr) ? arr.map((s) => String(s)) : [];
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function saveStockOrder(list) {
+          try { localStorage.setItem(STOCK_ORDER_KEY, JSON.stringify(list)); } catch { /* noop */ }
+        }
 
         function getCustomStocks() {
           try {
@@ -1576,11 +1791,15 @@
           });
         }
 
-        async function loadMarketOverview() {
+        async function loadMarketOverview(force) {
           try {
             const extra = getCustomStocks();
-            const query = extra.length ? `?symbols=${encodeURIComponent(extra.join(","))}` : "";
-            const resp = await fetch(`/api/market-overview${query}`);
+            const params = new URLSearchParams();
+            if (extra.length) params.set("symbols", extra.join(","));
+            if (force) params.set("refresh", "1");
+            const qs = params.toString();
+            const url = `${window.API_BASE||""}/api/market-overview${qs ? "?" + qs : ""}`;
+            const resp = await fetch(url, { cache: "no-store" });
             if (!resp.ok) return;
             const data = await resp.json();
             const rows = data.rows || [];
@@ -1606,6 +1825,8 @@
           });
         }
 
+        let lastStockData = null;
+
         async function loadStockDetail(symbol, displayName) {
           if (!symbol) return;
           currentStockSymbol = symbol;
@@ -1630,7 +1851,7 @@
           metaEl.textContent = "";
 
           try {
-            const url = `/api/stock-detail?symbol=${encodeURIComponent(symbol)}&range=${encodeURIComponent(currentStockRange)}`;
+            const url = `${window.API_BASE||""}/api/stock-detail?symbol=${encodeURIComponent(symbol)}&range=${encodeURIComponent(currentStockRange)}`;
             const resp = await fetch(url);
             if (!resp.ok) {
               priceEl.textContent = "—";
@@ -1638,6 +1859,7 @@
               return;
             }
             const data = await resp.json();
+            lastStockData = data;
             const series = data.series || [];
             if (data.latest_close !== null && data.latest_close !== undefined) {
               priceEl.textContent = Number(data.latest_close).toFixed(2);
@@ -1660,6 +1882,41 @@
           }
         }
 
+        // Pick out the biggest absolute % moves in a stock series — used for
+        // markPoint annotations on the right-pane chart. Mirrors the world
+        // map's significant-move logic so the UX is consistent.
+        function _stockSignificantMoves(series) {
+          if (!Array.isArray(series) || series.length < 5) return [];
+          const withChg = [];
+          for (let i = 1; i < series.length; i++) {
+            const prev = series[i - 1].close;
+            const cur = series[i].close;
+            if (!prev || !cur) continue;
+            const chg = (cur / prev - 1) * 100;
+            withChg.push({ idx: i, date: series[i].date, close: cur, chg });
+          }
+          if (!withChg.length) return [];
+          const abs = withChg.map(p => Math.abs(p.chg));
+          const mean = abs.reduce((s, v) => s + v, 0) / abs.length;
+          const variance = abs.reduce((s, v) => s + (v - mean) ** 2, 0) / Math.max(1, abs.length - 1);
+          const sd = Math.sqrt(variance);
+          const gate = Math.max(1.5, 1.5 * sd);
+          const sorted = [...withChg].sort((a, b) => Math.abs(b.chg) - Math.abs(a.chg));
+          let chosen = sorted.filter(p => Math.abs(p.chg) >= gate).slice(0, 6);
+          if (!chosen.length) chosen = sorted.slice(0, 3);
+          return chosen.sort((a, b) => a.idx - b.idx);
+        }
+
+        function _newsForStockDate(date) {
+          if (!lastStockData || !Array.isArray(lastStockData.news)) return [];
+          const target = new Date(date + "T00:00:00Z").getTime() / 1000;
+          if (Number.isNaN(target)) return [];
+          return lastStockData.news.filter(a => {
+            if (!a || !a.ts) return false;
+            return Math.abs(a.ts - target) <= 86400 * 1.5;
+          });
+        }
+
         function renderStockChart(series, label) {
           const el = document.getElementById("stock-detail-chart");
           if (!el || typeof echarts === "undefined") return;
@@ -1667,6 +1924,11 @@
             stockDetailChart = echarts.init(el, null, { renderer: "canvas" });
             window.addEventListener("resize", () => {
               if (stockDetailChart) stockDetailChart.resize();
+            });
+            stockDetailChart.on("click", (params) => {
+              if (params && params.componentType === "markPoint" && params.data && params.data.date) {
+                showStockSignificantNews(params.data.date);
+              }
             });
           }
           if (!series || series.length === 0) {
@@ -1681,10 +1943,32 @@
           const closes = series.map(p => p.close);
           const isUp = closes[closes.length - 1] >= closes[0];
           const lineColor = isUp ? "#22c55e" : "#ef4444";
+
+          const sig = _stockSignificantMoves(series);
+          const markPointData = sig.map(s => ({
+            name: s.date,
+            date: s.date,
+            chg: s.chg,
+            value: _fmtSignedPct(s.chg),
+            xAxis: s.date,
+            yAxis: s.close,
+            symbol: "circle",
+            symbolSize: 11,
+            itemStyle: {
+              color: _chgColor(s.chg),
+              borderColor: "#0a0a0a",
+              borderWidth: 2,
+              shadowBlur: 8,
+              shadowColor: _chgColor(s.chg),
+            },
+            label: { show: false },
+          }));
+
           stockDetailChart.setOption({
             backgroundColor: "transparent",
             tooltip: {
               trigger: "axis",
+              axisPointer: { type: "line", lineStyle: { color: "#525252", type: "dashed" } },
               backgroundColor: "rgba(20, 20, 20, 0.95)",
               borderColor: "#3f3f3f",
               textStyle: { color: "#e5e5e5", fontSize: 12 },
@@ -1731,9 +2015,69 @@
                 },
               },
               smooth: false,
+              markPoint: {
+                symbol: "circle",
+                data: markPointData,
+                tooltip: {
+                  trigger: "item",
+                  backgroundColor: "rgba(20, 20, 20, 0.95)",
+                  borderColor: "#3f3f3f",
+                  borderWidth: 1,
+                  padding: [10, 12],
+                  textStyle: { color: "#e5e5e5", fontSize: 12 },
+                  extraCssText: "max-width: 320px; white-space: normal; word-break: break-word; box-shadow: 0 6px 20px rgba(0,0,0,0.55); border-radius: 6px;",
+                  confine: true,
+                  formatter: (params) => {
+                    const d = params.data || {};
+                    return `<div style="font-weight:700; margin-bottom:2px; color:#f5f5f5;">${_escHtml(d.date)}</div>` +
+                           `<div style="color:${_chgColor(d.chg)}; font-weight:700;">${_fmtSignedPct(d.chg)}</div>` +
+                           `<div style="margin-top:6px; color:#60a5fa; font-size:11px;">Click for matching headlines</div>`;
+                  },
+                },
+                label: { show: false },
+              },
             }],
           }, true);
           stockDetailChart.resize();
+        }
+
+        // Highlight news in the stock-detail-news pane that match a markPoint date.
+        function showStockSignificantNews(date) {
+          const container = document.getElementById("stock-detail-news");
+          if (!container || !lastStockData) return;
+          const matches = _newsForStockDate(date);
+          // Remove previous expanded section
+          const prev = container.querySelector(".sd-day-news");
+          if (prev) prev.remove();
+
+          const block = document.createElement("div");
+          block.className = "sd-day-news";
+          block.style.cssText = "padding:10px 12px;background:rgba(96,165,250,0.10);border:1px solid #60a5fa;border-radius:2px;margin-top:4px;";
+          if (!matches.length) {
+            block.innerHTML = `<div style="color:#f5f5f5;font-weight:600;">${_escHtml(date)}</div>` +
+              `<div class="news-meta" style="color:#9ca3af;">No matching headlines within ±1 day. (Stock news only covers the last 30 days.)</div>`;
+          } else {
+            const items = matches.slice(0, 6).map(a => {
+              const ts = a.ts ? new Date(a.ts * 1000) : null;
+              const when = ts ? ts.toISOString().slice(0, 10) : "";
+              const src = a.source ? _escHtml(a.source) : "";
+              const title = _escHtml(a.title || "(untitled)");
+              const link = a.url || "#";
+              return `<div class="news-meta" style="margin-top:4px;line-height:1.45;">` +
+                `<a href="${link}" target="_blank" rel="noopener" style="color:#60a5fa;">${title}</a> ` +
+                `<span style="color:#9ca3af;">${src}${src && when ? " · " : ""}${when}</span></div>`;
+            }).join("");
+            block.innerHTML = `<div style="color:#f5f5f5;font-weight:700;margin-bottom:4px;">` +
+              `Significant move on ${_escHtml(date)}</div>${items}`;
+          }
+          // Insert directly after the heading h3 so it appears at the top of the news list.
+          const heading = container.querySelector("h3");
+          if (heading && heading.nextSibling) {
+            container.insertBefore(block, heading.nextSibling);
+          } else {
+            container.appendChild(block);
+          }
+          container.scrollTop = 0;
         }
 
         function renderStockNews(container, data) {
@@ -1813,7 +2157,7 @@
           }
 
           try {
-            const resp = await fetch(`/api/indicator-history?indicator_id=${encodeURIComponent(indicatorId)}&days=${days}`);
+            const resp = await fetch(`${window.API_BASE||""}/api/indicator-history?indicator_id=${encodeURIComponent(indicatorId)}&days=${days}`);
             if (!resp.ok) {
               metaEl.textContent = "Failed to load history.";
               emptyEl.style.display = "block";
@@ -1847,6 +2191,21 @@
             const values = series.map(p => p.value);
             const latestValue = values[values.length - 1];
 
+            // Per-point dot color: red if above top/in top-zone, green if
+            // below bottom/in bottom-zone, white otherwise. Used on hover
+            // and for the colored swatch in the tooltip.
+            const _zoneRange = (z) => z ? [Math.min(z[0], z[1]), Math.max(z[0], z[1])] : null;
+            const _topZoneRange = _zoneRange(topZone);
+            const _botZoneRange = _zoneRange(bottomZone);
+            const pointColors = values.map(v => {
+              if (v === null || v === undefined || Number.isNaN(v)) return "#e5e5e5";
+              if (topLineValue !== null && !Number.isNaN(topLineValue) && v >= topLineValue) return "#ef4444";
+              if (bottomLineValue !== null && !Number.isNaN(bottomLineValue) && v <= bottomLineValue) return "#22c55e";
+              if (_topZoneRange && v >= _topZoneRange[0] && v <= _topZoneRange[1]) return "#ef4444";
+              if (_botZoneRange && v >= _botZoneRange[0] && v <= _botZoneRange[1]) return "#22c55e";
+              return "#e5e5e5";
+            });
+
             const datasets = [{
               label: unit ? `${indicatorName} (${unit})` : indicatorName,
               data: values,
@@ -1854,6 +2213,10 @@
               backgroundColor: "rgba(229, 229, 229, 0.10)",
               borderWidth: 2,
               pointRadius: 0,
+              pointHoverRadius: 5,
+              pointHoverBackgroundColor: pointColors,
+              pointHoverBorderColor: "#0a0a0a",
+              pointHoverBorderWidth: 2,
               tension: 0.25,
               fill: "start",
               order: 1,
@@ -1918,7 +2281,7 @@
 
             indicatorChart = new Chart(canvas, {
               type: "line",
-              plugins: [thresholdLabelPlugin],
+              plugins: [thresholdLabelPlugin, verticalLinePlugin],
               data: {
                 labels,
                 datasets,
@@ -1926,6 +2289,8 @@
               options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                interaction: { mode: "index", intersect: false, axis: "x" },
+                hover: { mode: "index", intersect: false, axis: "x" },
                 plugins: {
                   legend: { display: false },
                   thresholdLabels: {
@@ -1937,8 +2302,27 @@
                     unit,
                   },
                   tooltip: {
+                    enabled: true,
+                    mode: "index",
+                    intersect: false,
+                    backgroundColor: "rgba(20, 20, 20, 0.95)",
+                    borderColor: "#3f3f3f",
+                    borderWidth: 1,
+                    padding: 10,
+                    titleColor: "#a3a3a3",
+                    titleFont: { size: 11, weight: "400" },
+                    bodyColor: "#f5f5f5",
+                    bodyFont: { size: 12, weight: "600" },
+                    boxPadding: 4,
+                    displayColors: true,
+                    filter: (item) => item.datasetIndex === 0,
                     callbacks: {
-                      label: (ctx) => _formatChartValue(ctx.parsed.y, unit),
+                      title: (items) => items && items[0] ? items[0].label : "",
+                      label: (ctx) => " " + _formatChartValue(ctx.parsed.y, unit),
+                      labelColor: (ctx) => {
+                        const color = pointColors[ctx.dataIndex] || "#e5e5e5";
+                        return { borderColor: color, backgroundColor: color };
+                      },
                     },
                   },
                 },
@@ -2139,7 +2523,7 @@
           const noteEl = document.getElementById("world-data-note");
           if (asofEl) asofEl.textContent = "Loading...";
           try {
-            const url = force ? "/api/world-indices?refresh=1" : "/api/world-indices";
+            const url = force ? `${window.API_BASE||""}/api/world-indices?refresh=1` : `${window.API_BASE||""}/api/world-indices`;
             const resp = await fetch(url);
             if (!resp.ok) return;
             const data = await resp.json();
@@ -2347,7 +2731,7 @@
           if (metaEl) metaEl.textContent = "Loading...";
           if (newsEl) newsEl.innerHTML = '<div class="empty" style="grid-column: 1; padding: 0;">Loading significant moves...</div>';
           try {
-            const resp = await fetch(`/api/index-history?symbol=${encodeURIComponent(stooqSymbol)}&range=${encodeURIComponent(range)}`);
+            const resp = await fetch(`${window.API_BASE||""}/api/index-history?symbol=${encodeURIComponent(stooqSymbol)}&range=${encodeURIComponent(range)}`);
             if (!resp.ok) {
               if (metaEl) metaEl.textContent = "Failed to load history.";
               return;
@@ -2399,12 +2783,20 @@
           const closes = series.map(p => p.close);
 
           // X-axis: format depends on range, max 8 visible ticks.
+          //   • short (≤ 6mo): MM-DD
+          //   • medium (1y, 2y): YYYY-MM
+          //   • long (5y, all):  YYYY
           const range = (data.range || currentDetailRange || "1y").toLowerCase();
           const xFormatter = (value) => {
             if (!value) return "";
             const s = String(value);
-            if (range === "1m") return s.length >= 10 ? s.slice(5) : s; // MM-DD
-            return s.length >= 7 ? s.slice(0, 7) : s; // YYYY-MM for 1y / all
+            if (range === "1m" || range === "3m" || range === "6m") {
+              return s.length >= 10 ? s.slice(5) : s;
+            }
+            if (range === "5y" || range === "all") {
+              return s.length >= 4 ? s.slice(0, 4) : s;
+            }
+            return s.length >= 7 ? s.slice(0, 7) : s;
           };
           const xStep = Math.max(1, Math.ceil(dates.length / 8));
           const xInterval = (idx) => (idx % xStep === 0) || (idx === dates.length - 1);
@@ -2566,7 +2958,7 @@
           let articles = indexNewsCache.get(cacheKey);
           if (!articles) {
             try {
-              const resp = await fetch(`/api/index-news?symbol=${encodeURIComponent(currentDetailSymbol)}&date=${encodeURIComponent(dateStr)}&limit=8`);
+              const resp = await fetch(`${window.API_BASE||""}/api/index-news?symbol=${encodeURIComponent(currentDetailSymbol)}&date=${encodeURIComponent(dateStr)}&limit=8`);
               if (resp.ok) {
                 const data = await resp.json();
                 articles = data.articles || [];
@@ -2687,6 +3079,7 @@
           initTabs();
           loadMarketOverview();
           initStockSearch();
+          _initSortableHeaders();
           initIndicatorRanges();
           initIndicatorChart();
           initIndexDetailControls();
@@ -2694,16 +3087,221 @@
           initStockDetail();
           loadStockDetail("^spx", "^SPX");
           loadWorldIndices(false);
+          loadIndicators();
+          loadSignalsAndRegime();
         });
+        </script>
+
+        <!-- ── Cloudflare Worker API loader ────────────────────────────────── -->
+        <script>
+        // Set this to your Worker URL once deployed, e.g.:
+        //   window.API_BASE = "https://poor-trader-api.YOUR_ACCOUNT.workers.dev";
+        // Leave empty string to use the same origin (Pages + Worker on same domain via routing).
+        window.API_BASE = "https://poor-trader-api.13975887019.workers.dev";
+
+        const REFRESH_COOLDOWN_MS = 30 * 60 * 1000; // 30 min – server-side limit also enforces this
+        const REFRESH_TS_KEY = "dashboard.lastRefreshTs";
+
+        function getLastRefreshTs() {
+          try { return parseInt(localStorage.getItem(REFRESH_TS_KEY) || "0", 10) || 0; } catch { return 0; }
+        }
+        function setLastRefreshTs() {
+          try { localStorage.setItem(REFRESH_TS_KEY, String(Date.now())); } catch { /* noop */ }
+        }
+        function refreshCooldownRemaining() {
+          const elapsed = Date.now() - getLastRefreshTs();
+          return Math.max(0, REFRESH_COOLDOWN_MS - elapsed);
+        }
+        function formatCooldown(ms) {
+          const h = Math.floor(ms / 3600000);
+          const m = Math.ceil((ms % 3600000) / 60000);
+          return h > 0 ? `${h}h ${m}m` : `${m}m`;
+        }
+
+        async function globalRefresh() {
+          const remaining = refreshCooldownRemaining();
+          if (remaining > 0) {
+            alert(`Update is on cooldown. Please wait ${formatCooldown(remaining)} before refreshing again.`);
+            return;
+          }
+          const btn = document.getElementById("global-refresh-btn");
+          if (btn) { btn.textContent = "Refreshing..."; btn.style.pointerEvents = "none"; }
+          try {
+            const resp = await fetch(`${window.API_BASE||""}/api/refresh`, { method: "POST" });
+            if (resp.ok) {
+              setLastRefreshTs();
+              await Promise.all([loadIndicators(), loadSignalsAndRegime(), loadMarketOverview(), loadWorldIndices(true)]);
+              if (btn) btn.textContent = "Updated ✓";
+              setTimeout(() => { if (btn) { btn.textContent = "Update"; btn.style.pointerEvents = ""; } }, 3000);
+            } else {
+              if (btn) { btn.textContent = "Failed"; btn.style.pointerEvents = ""; }
+              setTimeout(() => { if (btn) btn.textContent = "Update"; }, 3000);
+            }
+          } catch (e) {
+            console.error("globalRefresh:", e);
+            if (btn) { btn.textContent = "Error"; btn.style.pointerEvents = ""; }
+            setTimeout(() => { if (btn) btn.textContent = "Update"; }, 3000);
+          }
+        }
+
+        async function loadIndicators() {
+          try {
+            // Cache-bust so we never see a stale `last_update` from a
+            // browser or edge cache.
+            const resp = await fetch(`${API_BASE}/api/latest?_=${Date.now()}`, { cache: "no-store" });
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const rows = data.rows || [];
+            if (data.last_update) {
+              const el = document.getElementById("last-update-time");
+              if (el) {
+                const d = new Date(data.last_update);
+                if (isNaN(d)) {
+                  el.textContent = data.last_update;
+                } else {
+                  // Format without seconds (e.g. "4/30/2026, 9:44 AM").
+                  const datePart = d.toLocaleDateString("en-US");
+                  const timePart = d.toLocaleTimeString("en-US", {
+                    hour: "numeric",
+                    minute: "2-digit",
+                    hour12: true,
+                  });
+                  el.textContent = `${datePart}, ${timePart}`;
+                }
+              }
+            }
+            const tbody = document.querySelector(".indicator-table tbody");
+            if (!tbody || !rows.length) return;
+            tbody.innerHTML = "";
+            for (const r of rows) {
+              const isTop = r.is_top, isBot = r.is_bottom;
+              const rowStyle = isTop
+                ? "background-color:var(--bear-soft);border-left:3px solid var(--bear);"
+                : isBot
+                  ? "background-color:var(--bull-soft);border-left:3px solid var(--bull);"
+                  : "border-left:3px solid transparent;";
+              const valStyle = isTop
+                ? "color:var(--bear);font-weight:600;"
+                : isBot
+                  ? "color:var(--bull);font-weight:600;"
+                  : "color:var(--muted);";
+              const srcCell = r.source_url
+                ? `<a href="${r.source_url}" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:none;">${r.source || "—"}</a>`
+                : (r.source || "—");
+              const tr = document.createElement("tr");
+              tr.className = "indicator-row";
+              tr.dataset.indicatorId = r.id;
+              tr.dataset.indicatorName = r.name;
+              tr.style.cssText = rowStyle;
+              tr.innerHTML = `<td>${r.name}</td><td>${r.as_of || "—"}</td><td style="${valStyle}">${r.value !== null && r.value !== undefined ? r.value : "—"}</td><td style="white-space:nowrap;">${srcCell}</td>`;
+              tbody.appendChild(tr);
+            }
+            // Re-attach click handlers for indicator chart
+            if (typeof initIndicatorChart === "function") initIndicatorChart();
+          } catch (e) {
+            console.error("loadIndicators:", e);
+          }
+        }
+
+        async function loadSignalsAndRegime() {
+          try {
+            const [alertsResp, regimeResp] = await Promise.all([
+              fetch(`${API_BASE}/api/alerts`),
+              fetch(`${API_BASE}/api/regime`),
+            ]);
+
+            // ── Signals / alerts table ──────────────────────────────────────
+            if (alertsResp.ok) {
+              const signals = await alertsResp.json();
+              const tbody = document.querySelector("#signals-loading-row")?.closest("tbody")
+                         || document.querySelector("[data-page='signals'] table tbody");
+              const topCount  = signals.filter(s => s.top).length;
+              const botCount  = signals.filter(s => s.bottom).length;
+              const topEl  = document.getElementById("top-score");
+              const botEl  = document.getElementById("bottom-score");
+              if (topEl)  topEl.textContent  = String(topCount);
+              if (botEl)  botEl.textContent  = String(botCount);
+              if (tbody) {
+                tbody.innerHTML = "";
+                signals.forEach((s, i) => {
+                  const tr = document.createElement("tr");
+                  const topPill  = s.top    ? '<span class="pill bear">Top</span>'    : '<span class="pill neutral">—</span>';
+                  const botPill  = s.bottom ? '<span class="pill bull">Bottom</span>' : '<span class="pill neutral">—</span>';
+                  tr.innerHTML = `<td style="text-align:center;">${i+1}</td><td>${s.title}</td><td>${topPill}</td><td>${botPill}</td><td class="meta">${s.detail}</td>`;
+                  tbody.appendChild(tr);
+                });
+              }
+            }
+
+            // ── Market Regime card ──────────────────────────────────────────
+            if (regimeResp.ok) {
+              const r = await regimeResp.json();
+              const container = document.getElementById("regime-container");
+              if (!container) return;
+
+              const bands = [
+                ["regime-strong-buy",   "Strong Buy",   "≥ +9.0",       "buy-strong"],
+                ["regime-buy",          "Buy",          "+4.5 to +9.0", "buy-mid"],
+                ["regime-cautious-buy", "Cautious Buy", "+1.5 to +4.5", "buy-soft"],
+                ["regime-neutral",      "Neutral",      "−1.5 to +1.5", "neutral"],
+                ["regime-caution",      "Caution",      "−4.5 to −1.5", "risk-soft"],
+                ["regime-risk",         "Risk",         "−9.0 to −4.5", "risk-mid"],
+                ["regime-strong-risk",  "Strong Risk",  "≤ −9.0",       "risk-strong"],
+              ];
+              const bandRows = bands.map(([rc, label, range, swatch]) =>
+                `<div class="band-row ${swatch}${rc === r.css_class ? " active" : ""}"><span class="band-dot"></span><span class="band-label">${label}</span><span class="band-range">${range}</span></div>`
+              ).join("");
+
+              const contribRows = (r.contributions || []).map(c => {
+                const cls = c.points > 0 ? "buy" : c.points < 0 ? "risk" : "neutral";
+                const pts = (c.points >= 0 ? "+" : "") + c.points.toFixed(1);
+                return `<div class="row"><span class="pts ${cls}">${pts}</span><span class="name">${c.title}</span><span class="reason">${c.reason}</span></div>`;
+              }).join("");
+
+              const scoreStr = (r.score >= 0 ? "+" : "") + r.score.toFixed(1);
+              // Render inside the wrapper so subsequent updates can find
+              // #regime-container again (outerHTML would replace the node
+              // and break repeated refreshes via the Update button).
+              container.className = `regime-card ${r.css_class}`;
+              container.innerHTML = `<div class="regime-headline">
+    <div class="regime-eyebrow">Market Regime · Composite View</div>
+    <div class="regime-label">${r.label}</div>
+    <div class="regime-meter">
+      <div class="regime-score">${scoreStr}</div>
+      <div class="regime-pts">
+        <span class="buy">+${r.buy_points.toFixed(1)} buy</span> &nbsp;/&nbsp;
+        <span class="risk">−${r.risk_points.toFixed(1)} risk</span><br>
+        <span style="color:var(--muted);">${r.coverage}/${r.total} indicators triggered</span>
+      </div>
+    </div>
+  </div>
+  <div class="regime-bands-table">${bandRows}</div>
+  <div class="regime-contribs">
+    <div class="regime-eyebrow" style="margin-bottom:6px;">Indicator Contributions</div>
+    ${contribRows}
+  </div>`;
+            }
+          } catch (e) {
+            console.error("loadSignalsAndRegime:", e);
+          }
+        }
         </script>
       </div>
 
       <footer class="site-footer">
         <div class="footer-sources">
           Indicator Sources:
-          {% for s in sources %}
-            <a href="{{ s.url }}" target="_blank" rel="noopener">{{ s.name }}</a>{% if not loop.last %} / {% endif %}
-          {% endfor %}
+          <a href="https://tradingeconomics.com/united-states/bofa-merrill-lynch-us-high-yield-option-adjusted-spread-fed-data.html" target="_blank" rel="noopener">US HY OAS</a> /
+          <a href="https://ycharts.com/indicators/us_investor_sentiment_bull_bear_spread" target="_blank" rel="noopener">AAII Bull-Bear</a> /
+          <a href="https://edition.cnn.com/markets/fear-and-greed" target="_blank" rel="noopener">CNN Fear &amp; Greed</a> /
+          <a href="https://www.multpl.com/s-p-500-pe-ratio/table/by-month" target="_blank" rel="noopener">S&amp;P 500 PE</a> /
+          <a href="https://www.barrons.com/market-data/stocks/us/pe-yields" target="_blank" rel="noopener">Nasdaq 100 PE</a> /
+          <a href="https://www.barchart.com/stocks/quotes/$NDTW" target="_blank" rel="noopener">NDX &gt; 20d MA</a> /
+          <a href="https://fred.stlouisfed.org/series/BAMLH0A0HYM2" target="_blank" rel="noopener">FRED HY OAS</a> /
+          <a href="https://fred.stlouisfed.org/series/T10Y2Y" target="_blank" rel="noopener">FRED Yield Curve</a>
+          &nbsp;·&nbsp;
+          API: <a href="/api/latest" target="_blank" rel="noopener">/api/latest</a> /
+          <a href="/api/alerts" target="_blank" rel="noopener">/api/alerts</a>
         </div>
         <div class="footer-links">
           For collaboration or questions, please reach out via the project:
