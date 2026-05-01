@@ -67,7 +67,7 @@ const INDICATOR_SOURCE_URLS: Record<string, string> = {
   cnn_fear_greed_index:   "https://edition.cnn.com/markets/fear-and-greed",
   cnn_put_call_options:   "https://edition.cnn.com/markets/fear-and-greed",
   sp500_pe_ratio:         "https://www.multpl.com/s-p-500-pe-ratio/table/by-month",
-  nasdaq100_pe_ratio:     "https://www.barrons.com/market-data/stocks/us/pe-yields",
+  nasdaq100_pe_ratio:     "https://worldperatio.com/index/nasdaq-100/",
   sp500_rsi:              "https://www.investing.com/indices/us-spx-500-technical",
   nasdaq100_above_20d_ma: "https://www.barchart.com/stocks/quotes/$NDTW",
   vix:                    "https://edition.cnn.com/markets/fear-and-greed",
@@ -98,30 +98,43 @@ const DEFAULT_MARKET_SYMBOLS = [
   "brk-b.us", "rklb.us", "amzn.us", "ko.us", "zeta.us", "q.us", "sols.us",
 ];
 
-const DEFAULT_ITEMS: Array<{ symbol: string; yahoo: string }> = [
-  { symbol: "^spx",    yahoo: "^GSPC" },
-  { symbol: "^dji",    yahoo: "^DJI" },
-  { symbol: "^ndq",    yahoo: "^IXIC" },
-  { symbol: "btc.v",   yahoo: "BTC-USD" },
-  { symbol: "xauusd",  yahoo: "GC=F" },
-  { symbol: "xagusd",  yahoo: "SI=F" },
-  { symbol: "nvo.us",   yahoo: "NVO"   },
-  { symbol: "aapl.us",  yahoo: "AAPL"  },
-  { symbol: "goog.us",  yahoo: "GOOG"  },
-  { symbol: "nvda.us",  yahoo: "NVDA"  },
-  { symbol: "tsla.us",  yahoo: "TSLA"  },
-  { symbol: "meta.us",  yahoo: "META"  },
-  { symbol: "msft.us",  yahoo: "MSFT"  },
-  { symbol: "hood.us",  yahoo: "HOOD"  },
-  { symbol: "mu.us",    yahoo: "MU"    },
-  { symbol: "brk-b.us", yahoo: "BRK-B" },
-  { symbol: "rklb.us",  yahoo: "RKLB"  },
-  { symbol: "amzn.us",  yahoo: "AMZN"  },
-  { symbol: "ko.us",    yahoo: "KO"    },
-  { symbol: "zeta.us",  yahoo: "ZETA"  },
-  { symbol: "q.us",     yahoo: "Q"     },
-  { symbol: "sols.us",  yahoo: "SOLS"  },
+// `name` is the display label the SPA uses in the market tables — keep it
+// stable even when Yahoo's own ticker looks different (e.g. ^GSPC vs ^SPX,
+// GC=F vs XAU, BTC-USD vs BTC). Previously we wrote `name: yahooSym` into
+// D1 which caused the Reload button to "rename" rows to their Yahoo slugs.
+const DEFAULT_ITEMS: Array<{ symbol: string; yahoo: string; name: string }> = [
+  { symbol: "^spx",     yahoo: "^GSPC",   name: "^SPX"  },
+  { symbol: "^dji",     yahoo: "^DJI",    name: "^DJI"  },
+  { symbol: "^ndq",     yahoo: "^IXIC",   name: "^NDQ"  },
+  { symbol: "btc.v",    yahoo: "BTC-USD", name: "BTC"   },
+  { symbol: "xauusd",   yahoo: "GC=F",    name: "XAU"   },
+  { symbol: "xagusd",   yahoo: "SI=F",    name: "XAG"   },
+  { symbol: "nvo.us",   yahoo: "NVO",     name: "NVO"   },
+  { symbol: "aapl.us",  yahoo: "AAPL",    name: "AAPL"  },
+  { symbol: "goog.us",  yahoo: "GOOG",    name: "GOOG"  },
+  { symbol: "nvda.us",  yahoo: "NVDA",    name: "NVDA"  },
+  { symbol: "tsla.us",  yahoo: "TSLA",    name: "TSLA"  },
+  { symbol: "meta.us",  yahoo: "META",    name: "META"  },
+  { symbol: "msft.us",  yahoo: "MSFT",    name: "MSFT"  },
+  { symbol: "hood.us",  yahoo: "HOOD",    name: "HOOD"  },
+  { symbol: "mu.us",    yahoo: "MU",      name: "MU"    },
+  { symbol: "brk-b.us", yahoo: "BRK-B",   name: "BRK-B" },
+  { symbol: "rklb.us",  yahoo: "RKLB",    name: "RKLB"  },
+  { symbol: "amzn.us",  yahoo: "AMZN",    name: "AMZN"  },
+  { symbol: "ko.us",    yahoo: "KO",      name: "KO"    },
+  { symbol: "zeta.us",  yahoo: "ZETA",    name: "ZETA"  },
+  { symbol: "q.us",     yahoo: "Q",       name: "Q"     },
+  { symbol: "sols.us",  yahoo: "SOLS",    name: "SOLS"  },
 ];
+
+function friendlyNameForSymbol(symbol: string): string {
+  const s = (symbol || "").trim();
+  for (const item of DEFAULT_ITEMS) {
+    if (item.symbol.toLowerCase() === s.toLowerCase()) return item.name;
+  }
+  if (s.toLowerCase().endsWith(".us")) return s.slice(0, -3).toUpperCase();
+  return s.toUpperCase();
+}
 
 function toYahooSymbol(raw: string): string | null {
   if (!raw) return null;
@@ -142,8 +155,12 @@ function normalizeStockSymbol(raw: string): string | null {
   return `${s}.US`;
 }
 
-// ── Market overview: fetch from Stooq via Yahoo-style chart API ──────────────
-async function buildMarketRow(symbol: string, yahooSym: string): Promise<Record<string, unknown> | null> {
+// ── Market overview: fetch from Yahoo's chart API ────────────────────────────
+async function buildMarketRow(
+  symbol: string,
+  yahooSym: string,
+  displayName: string,
+): Promise<Record<string, unknown> | null> {
   try {
     const points = await fetchYahooChart(yahooSym, "1y", "1d");
     if (!points.length) return null;
@@ -154,11 +171,15 @@ async function buildMarketRow(symbol: string, yahooSym: string): Promise<Record<
     const w = points.length > 5  ? points[points.length - 6].close  : null;
     const m = points.length > 21 ? points[points.length - 22].close : null;
     const q = points.length > 63 ? points[points.length - 64].close : null;
-    const y = points.length > 252? points[0].close                  : null;
+    // 1Y % vs oldest bar in Yahoo's `range=1y` window (≈ 252 trading days).
+    // Yahoo often returns 251 daily bars for US equities (^GSPC etc.), so a
+    // threshold of 252 would permanently blank the 1Y column — `points[0]` is
+    // always the window anchor for this fetch.
+    const y = points.length >= 2 ? points[0].close : null;
 
     const pct = (prev: number | null) => prev ? Math.round((close / prev - 1) * 10000) / 100 : null;
     return {
-      symbol, name: yahooSym, as_of: asOf, close,
+      symbol, name: displayName, as_of: asOf, close,
       chg_1w_pct: pct(w), chg_1m_pct: pct(m),
       chg_3m_pct: pct(q), chg_1y_pct: pct(y),
       source_url: `https://finance.yahoo.com/quote/${encodeURIComponent(yahooSym)}`,
@@ -170,7 +191,7 @@ async function buildMarketRow(symbol: string, yahooSym: string): Promise<Record<
 
 // ── Main fetch handler ────────────────────────────────────────────────────────
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
     const { pathname } = url;
 
@@ -270,18 +291,24 @@ export default {
       const extraSymbols = rawSymbols.split(",").map((s) => s.trim()).filter(Boolean);
       const force = url.searchParams.get("refresh") === "1";
 
-      // Build the list of symbols to fetch
-      const symbolMap = new Map<string, string>(); // symbol → yahooSym
-      for (const item of DEFAULT_ITEMS) symbolMap.set(item.symbol, item.yahoo);
+      // Build the list of symbols to fetch. Each entry is
+      // [symbolKey, yahooSym, displayName].
+      const symbolPlan = new Map<string, { yahoo: string; name: string }>();
+      for (const item of DEFAULT_ITEMS) {
+        symbolPlan.set(item.symbol, { yahoo: item.yahoo, name: item.name });
+      }
       for (const raw of extraSymbols) {
         const norm = normalizeStockSymbol(raw);
-        if (norm) symbolMap.set(norm.toLowerCase(), norm.slice(0, -3));
+        if (norm) {
+          const yahoo = norm.slice(0, -3);
+          symbolPlan.set(norm.toLowerCase(), { yahoo, name: yahoo });
+        }
       }
 
       // Try cache from D1 first (unless force refresh)
       let dbRows: Record<string, unknown>[] = [];
       if (!force) {
-        const syms = [...symbolMap.keys()];
+        const syms = [...symbolPlan.keys()];
         dbRows = await getMarketOverviewRows(env.DB, syms);
       }
 
@@ -289,13 +316,10 @@ export default {
       for (const r of dbRows) dbMap.set(String(r.symbol).toLowerCase(), r);
 
       // Fetch missing symbols from Yahoo (async, best-effort)
-      const missingSymbols = [...symbolMap.entries()].filter(([sym]) => !dbMap.has(sym));
+      const missingSymbols = [...symbolPlan.entries()].filter(([sym]) => !dbMap.has(sym));
       if (missingSymbols.length > 0) {
         const fetched = await Promise.allSettled(
-          missingSymbols.map(async ([sym, yahoo]) => {
-            const row = await buildMarketRow(sym, yahoo);
-            return row;
-          }),
+          missingSymbols.map(([sym, plan]) => buildMarketRow(sym, plan.yahoo, plan.name)),
         );
         const newRows: Record<string, unknown>[] = [];
         for (const r of fetched) {
@@ -305,13 +329,29 @@ export default {
           }
         }
         if (newRows.length) {
-          // Fire-and-forget cache write
-          void upsertMarketOverviewRows(env.DB, newRows);
+          // Cloudflare Workers terminate in-flight async work once the
+          // Response is returned unless it's wrapped in ctx.waitUntil.
+          // Using `void` here silently dropped the D1 write, which is why
+          // the Market page would "flash fresh" on Reload and then revert
+          // to the old values after a browser refresh.
+          ctx.waitUntil(upsertMarketOverviewRows(env.DB, newRows));
+        }
+      }
+
+      // Backfill: make sure cached rows always carry the friendly display
+      // name. Older D1 rows were written with the Yahoo slug (^GSPC, GC=F,
+      // BTC-USD, ...) as `name`, so a page load can now heal them in-place.
+      for (const [sym, plan] of symbolPlan.entries()) {
+        const row = dbMap.get(sym);
+        if (!row) continue;
+        const desired = plan.name;
+        if (row.name !== desired) {
+          row.name = desired;
         }
       }
 
       // Build ordered result
-      const rows = [...symbolMap.keys()].map((sym) => dbMap.get(sym)).filter(Boolean);
+      const rows = [...symbolPlan.keys()].map((sym) => dbMap.get(sym)).filter(Boolean);
       return json({ rows, as_of_utc: new Date().toISOString(), refreshing: false });
     }
 
@@ -342,7 +382,7 @@ export default {
           articles = cached;
         } else {
           articles = await fetchCompanyNews(newsTicker, fromStr, todayStr, env.FINNHUB_KEY!);
-          void upsertNewsCache(env.DB, `stock:${newsTicker}`, todayStr, articles);
+          ctx.waitUntil(upsertNewsCache(env.DB, `stock:${newsTicker}`, todayStr, articles));
         }
       }
 
@@ -371,7 +411,7 @@ export default {
             } else {
               const from = new Date(Date.now() - 3 * 86400 * 1000).toISOString().slice(0, 10);
               news = await fetchCompanyNews(meta.finnhub, from, todayStr, env.FINNHUB_KEY!);
-              void upsertNewsCache(env.DB, cacheKey, todayStr, news);
+              ctx.waitUntil(upsertNewsCache(env.DB, cacheKey, todayStr, news));
             }
           }
 
@@ -469,7 +509,7 @@ export default {
               const to = new Date(new Date(dateStr).getTime() + 1 * 86400 * 1000).toISOString().slice(0, 10);
               dayNews = await fetchCompanyNews(meta.finnhub, from, to, env.FINNHUB_KEY!);
               dayNews = (dayNews as unknown[]).slice(0, 3);
-              void upsertNewsCache(env.DB, cacheKey, dateStr, dayNews);
+              ctx.waitUntil(upsertNewsCache(env.DB, cacheKey, dateStr, dayNews));
             }
           }
           significant.push({ date: p.date, close: p.close, chg_pct: p.chg_pct!, news: dayNews });
@@ -502,7 +542,7 @@ export default {
 
       const from = new Date(new Date(dateStr).getTime() - 3 * 86400 * 1000).toISOString().slice(0, 10);
       const articles = await fetchCompanyNews(meta.finnhub, from, dateStr, env.FINNHUB_KEY!);
-      void upsertNewsCache(env.DB, `world:${meta.stooq}`, dateStr, articles);
+      ctx.waitUntil(upsertNewsCache(env.DB, `world:${meta.stooq}`, dateStr, articles));
 
       return json({ articles: articles.slice(0, limit), symbol, date: dateStr, news_enabled: true });
     }
@@ -532,7 +572,7 @@ export default {
         "INSERT INTO kv_store (key, value, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at"
       ).bind(rlKey, nowTs).run();
 
-      let refreshOk = false;
+      let refreshOk: boolean | string[] = false;
       let errors: string[] = [];
       let wrote = 0;
       try {
@@ -545,12 +585,36 @@ export default {
         console.error("/api/refresh: fetchAllProviders/upsert failed", e);
         errors = [...errors, String(e)];
       }
+
+      // Also refresh the market_overview cache so the header "Update"
+      // button brings Indices / Futures & Crypto / default Stocks
+      // forward in addition to the macro indicators.
+      let marketWrote = 0;
+      try {
+        const settled = await Promise.allSettled(
+          DEFAULT_ITEMS.map((item) =>
+            buildMarketRow(item.symbol, item.yahoo, item.name),
+          ),
+        );
+        const freshRows: Record<string, unknown>[] = [];
+        for (const r of settled) {
+          if (r.status === "fulfilled" && r.value) freshRows.push(r.value);
+        }
+        if (freshRows.length) {
+          await upsertMarketOverviewRows(env.DB, freshRows);
+          marketWrote = freshRows.length;
+        }
+      } catch (e) {
+        console.error("/api/refresh: market_overview refresh failed", e);
+        errors = [...errors, `market_overview: ${String(e)}`];
+      }
+
       // Always advance the heartbeat so the UI's "Last Updated" stamp
       // moves even if upstream sources errored.
       try { await setLastCronRun(env.DB); } catch (e) {
         console.error("/api/refresh: setLastCronRun failed", e);
       }
-      return json({ ok: refreshOk, err: errors, wrote });
+      return json({ ok: refreshOk, err: errors, wrote, market_wrote: marketWrote });
     }
 
     // ── /api/status ──────────────────────────────────────────────────────────
@@ -581,6 +645,26 @@ export default {
         } catch (e) {
           console.error("scheduled: fetchAllProviders/upsert failed", e);
         }
+
+        // Refresh the market_overview cache (Indices / Futures & Crypto /
+        // Stocks). Without this, /api/market-overview keeps returning the
+        // first-ever snapshot — the endpoint only re-fetches *missing*
+        // symbols, so rows never age forward until a user hits Reload.
+        try {
+          const rows = await Promise.allSettled(
+            DEFAULT_ITEMS.map((item) =>
+              buildMarketRow(item.symbol, item.yahoo, item.name),
+            ),
+          );
+          const fresh: Record<string, unknown>[] = [];
+          for (const r of rows) {
+            if (r.status === "fulfilled" && r.value) fresh.push(r.value);
+          }
+          if (fresh.length) await upsertMarketOverviewRows(env.DB, fresh);
+        } catch (e) {
+          console.error("scheduled: market_overview refresh failed", e);
+        }
+
         try {
           await setLastCronRun(env.DB);
         } catch (e) {
