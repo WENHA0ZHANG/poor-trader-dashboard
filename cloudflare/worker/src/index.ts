@@ -547,11 +547,11 @@ export default {
       return json({ articles: articles.slice(0, limit), symbol, date: dateStr, news_enabled: true });
     }
 
-    // ── /api/refresh (manual trigger, rate-limited per IP: 1 per 5 min) ────
+    // ── /api/refresh (manual trigger, rate-limited per IP: 1 per 10 min) ────
     if (pathname === "/api/refresh" && request.method === "POST") {
       const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
       const rlKey = `ratelimit:refresh:${clientIp}`;
-      const COOLDOWN_SECONDS = 5 * 60;
+      const COOLDOWN_SECONDS = 10 * 60;
 
       const prev = await env.DB.prepare(
         "SELECT value FROM kv_store WHERE key = ?"

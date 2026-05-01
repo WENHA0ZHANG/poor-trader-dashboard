@@ -105,6 +105,50 @@
         color: var(--muted);
       }
       .tab-btn.active .tab-num { color: var(--text-strong); }
+      /* Navbar clock — lives at the right edge of the tabs row. Pure
+         client-side: never touches the Worker, so it doesn't affect D1
+         read quotas or the 20-minute auto-refresh cadence. */
+      .navbar-clock {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 4px 12px 18px;
+        color: var(--muted);
+        font-size: 13px;
+        font-family: inherit;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        user-select: none;
+        white-space: nowrap;
+      }
+      .navbar-clock .clock-time {
+        display: inline-flex;
+        align-items: baseline;
+      }
+      .navbar-clock .clock-hour,
+      .navbar-clock .clock-minute {
+        display: inline-block;
+        color: var(--muted);
+        transition: color 200ms ease-out;
+      }
+      .navbar-clock .clock-hour.invisible,
+      .navbar-clock .clock-minute.invisible {
+        color: var(--bg-soft);
+      }
+      .navbar-clock .clock-colon {
+        display: inline-block;
+        margin: 0 1px;
+        opacity: 1;
+        transition: opacity 760ms cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .navbar-clock .clock-colon.off {
+        opacity: 0.2;
+      }
+      .navbar-clock .clock-ampm { margin-left: 4px; }
+      @media (max-width: 720px) {
+        .navbar-clock .clock-date { display: none; }
+      }
       .page { display: none; }
       .page.active { display: block; }
       .meta { color: var(--muted); font-size: 12px; }
@@ -857,6 +901,12 @@
         <button class="tab-btn" data-tab="signals" role="tab" aria-selected="false">
           <span class="tab-num">04</span>Signals &amp; History
         </button>
+        <div class="navbar-clock" id="navbar-clock" aria-hidden="true">
+          <span class="clock-date" id="clock-date">--</span>
+          <span class="clock-time">
+            <span class="clock-hour" id="clock-hour">--</span><span class="clock-colon" id="clock-colon">:</span><span class="clock-minute" id="clock-minute">--</span><span class="clock-ampm" id="clock-ampm">--</span>
+          </span>
+        </div>
       </nav>
 
       <!-- ============== Page 1: Prediction (Indicator Trends + Market Regime) ============== -->
@@ -3126,6 +3176,60 @@
           document.addEventListener("visibilitychange", () => {
             if (!document.hidden) autoRefreshTick();
           });
+
+          // ── Navbar clock ──────────────────────────────────────────────────
+          // Local-only ticking clock at the far right of the tab bar.
+          // Colon breathes every two seconds; the hour and minute fade through
+          // the page background color when they roll over. No network calls.
+          (function initNavbarClock() {
+            const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+            function flashUpdate(el, newText) {
+              el.classList.add("invisible");
+              setTimeout(() => {
+                el.textContent = newText;
+                el.classList.remove("invisible");
+              }, 200);
+            }
+
+            function tick() {
+              const dateEl = document.getElementById("clock-date");
+              const hourEl = document.getElementById("clock-hour");
+              const minEl = document.getElementById("clock-minute");
+              const ampmEl = document.getElementById("clock-ampm");
+              const colonEl = document.getElementById("clock-colon");
+              if (!dateEl || !hourEl || !minEl || !ampmEl || !colonEl) return;
+
+              const now = new Date();
+              const dateStr = months[now.getMonth()] + " " + now.getDate() + ", " + now.getFullYear();
+              let hr = now.getHours();
+              const ampm = hr >= 12 ? "PM" : "AM";
+              hr = hr % 12;
+              if (hr === 0) hr = 12;
+              const hrStr = String(hr);
+              const minStr = String(now.getMinutes()).padStart(2, "0");
+
+              if (dateEl.textContent !== dateStr) dateEl.textContent = dateStr;
+              if (hourEl.textContent !== hrStr) {
+                if (hourEl.textContent === "--") hourEl.textContent = hrStr;
+                else flashUpdate(hourEl, hrStr);
+              }
+              if (minEl.textContent !== minStr) {
+                if (minEl.textContent === "--") minEl.textContent = minStr;
+                else flashUpdate(minEl, minStr);
+              }
+              if (ampmEl.textContent !== ampm) ampmEl.textContent = ampm;
+
+              // Two-second breathing cycle: one second fading down to 20%,
+              // one second fading back up. It still marks time without
+              // pulling attention away from the dashboard.
+              const cycle = Math.floor(Date.now() / 1000) % 2;
+              colonEl.classList.toggle("off", cycle === 1);
+            }
+
+            tick();
+            setInterval(tick, 120);
+          })();
         });
         </script>
 
@@ -3136,7 +3240,7 @@
         // Leave empty string to use the same origin (Pages + Worker on same domain via routing).
         window.API_BASE = "https://poor-trader-api.13975887019.workers.dev";
 
-        const REFRESH_COOLDOWN_MS = 5 * 60 * 1000; // 5 min – server-side limit also enforces this
+        const REFRESH_COOLDOWN_MS = 10 * 60 * 1000; // 10 min – server-side limit also enforces this
         const REFRESH_TS_KEY = "dashboard.lastRefreshTs";
 
         function getLastRefreshTs() {
