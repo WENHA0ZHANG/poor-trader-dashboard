@@ -3098,6 +3098,34 @@
           loadWorldIndices(false);
           loadIndicators();
           loadSignalsAndRegime();
+
+          // ── Background auto-refresh ───────────────────────────────────────
+          // Pull whatever the Worker (cron) has already written into D1.
+          // This is read-only — does NOT call /api/refresh — so it ignores
+          // the manual cooldown and just keeps the page in sync with the
+          // backend's own update cadence (currently every 30 min).
+          const AUTO_REFRESH_MS = 20 * 60 * 1000; // poll every 20 minutes
+          let _autoBusy = false;
+          async function autoRefreshTick() {
+            if (_autoBusy) return;
+            if (document.hidden) return;
+            _autoBusy = true;
+            try {
+              await Promise.allSettled([
+                typeof loadIndicators === "function" ? loadIndicators() : null,
+                typeof loadSignalsAndRegime === "function" ? loadSignalsAndRegime() : null,
+                typeof loadMarketOverview === "function" ? loadMarketOverview() : null,
+              ]);
+            } catch (e) {
+              console.error("autoRefreshTick:", e);
+            } finally {
+              _autoBusy = false;
+            }
+          }
+          setInterval(autoRefreshTick, AUTO_REFRESH_MS);
+          document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) autoRefreshTick();
+          });
         });
         </script>
 
@@ -3108,7 +3136,7 @@
         // Leave empty string to use the same origin (Pages + Worker on same domain via routing).
         window.API_BASE = "https://poor-trader-api.13975887019.workers.dev";
 
-        const REFRESH_COOLDOWN_MS = 30 * 60 * 1000; // 30 min – server-side limit also enforces this
+        const REFRESH_COOLDOWN_MS = 5 * 60 * 1000; // 5 min – server-side limit also enforces this
         const REFRESH_TS_KEY = "dashboard.lastRefreshTs";
 
         function getLastRefreshTs() {

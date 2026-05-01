@@ -12,11 +12,9 @@ database_name = "poor-trader-db"
 database_id = "213c84ef-816a-45c3-8d17-8c55ba57fa16"
 
 # ── Cron Triggers ──────────────────────────────────────────────────────────────
-# Refresh macro indicators on the hour, every hour. The "Last Updated"
-# timestamp on the dashboard advances each run via the heartbeat written
-# in `setLastCronRun`.
+# Refresh macro indicators every 30 minutes.
 [triggers]
-crons = ["0 * * * *"]
+crons = ["*/30 * * * *"]
 
 # ── Environment variables (non-secret) ────────────────────────────────────────
 [vars]

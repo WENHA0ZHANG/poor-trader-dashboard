@@ -547,11 +547,11 @@ export default {
       return json({ articles: articles.slice(0, limit), symbol, date: dateStr, news_enabled: true });
     }
 
-    // ── /api/refresh (manual trigger, rate-limited per IP: 1 per 30 min) ────
+    // ── /api/refresh (manual trigger, rate-limited per IP: 1 per 5 min) ────
     if (pathname === "/api/refresh" && request.method === "POST") {
       const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
       const rlKey = `ratelimit:refresh:${clientIp}`;
-      const COOLDOWN_SECONDS = 30 * 60;
+      const COOLDOWN_SECONDS = 5 * 60;
 
       const prev = await env.DB.prepare(
         "SELECT value FROM kv_store WHERE key = ?"
@@ -635,21 +635,39 @@ export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(
       (async () => {
-        // The heartbeat must advance on every cron run — even if upstream
-        // fetches blew up — otherwise the dashboard's "Last Updated"
-        // timestamp can appear to roll backwards when an edge cache
-        // serves an older snapshot.
+        const t0 = Date.now();
+        console.log(`scheduled: tick @ ${new Date().toISOString()}`);
+
+        // 1) Write the heartbeat FIRST. Earlier this lived at the bottom,
+        //    so any wall-time/CPU overrun in the upstream fetches would
+        //    silently drop the heartbeat write and the dashboard's
+        //    "Last Updated" timestamp would never move on a tick that
+        //    timed out. Doing it first means the timestamp tracks the
+        //    cron schedule itself, not the success of every scraper.
         try {
-          const { observations } = await fetchAllProviders(env);
+          await setLastCronRun(env.DB);
+          console.log(`scheduled: heartbeat written (+${Date.now() - t0}ms)`);
+        } catch (e) {
+          console.error("scheduled: setLastCronRun (early) failed", e);
+        }
+
+        // 2) Pull every macro provider into D1 (best-effort).
+        try {
+          const { ok, err, observations } = await fetchAllProviders(env);
           await upsertObservations(env.DB, observations);
+          console.log(
+            `scheduled: providers ok=${ok.length} err=${err.length} ` +
+              `wrote=${observations.length} (+${Date.now() - t0}ms)`,
+          );
+          if (err.length) console.error("scheduled: provider errors:", err);
         } catch (e) {
           console.error("scheduled: fetchAllProviders/upsert failed", e);
         }
 
-        // Refresh the market_overview cache (Indices / Futures & Crypto /
-        // Stocks). Without this, /api/market-overview keeps returning the
-        // first-ever snapshot — the endpoint only re-fetches *missing*
-        // symbols, so rows never age forward until a user hits Reload.
+        // 3) Refresh the market_overview cache (Indices / Futures & Crypto
+        //    / Stocks). Without this, /api/market-overview keeps returning
+        //    the first-ever snapshot — the endpoint only re-fetches *missing*
+        //    symbols, so rows never age forward until a user hits Reload.
         try {
           const rows = await Promise.allSettled(
             DEFAULT_ITEMS.map((item) =>
@@ -661,15 +679,24 @@ export default {
             if (r.status === "fulfilled" && r.value) fresh.push(r.value);
           }
           if (fresh.length) await upsertMarketOverviewRows(env.DB, fresh);
+          console.log(
+            `scheduled: market_overview wrote=${fresh.length} ` +
+              `(+${Date.now() - t0}ms)`,
+          );
         } catch (e) {
           console.error("scheduled: market_overview refresh failed", e);
         }
 
+        // 4) Final heartbeat. Most ticks reach here; this updates the
+        //    timestamp to the actual *completion* time so the dashboard
+        //    "Last Updated" reflects when the latest data really landed.
         try {
           await setLastCronRun(env.DB);
         } catch (e) {
-          console.error("scheduled: setLastCronRun failed", e);
+          console.error("scheduled: setLastCronRun (final) failed", e);
         }
+
+        console.log(`scheduled: done in ${Date.now() - t0}ms`);
       })(),
     );
   },
