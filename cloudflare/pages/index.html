@@ -1180,7 +1180,7 @@
                 <th style="width: 35%">Rule Description</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="signals-tbody">
               <tr id="signals-loading-row"><td colspan="5" class="meta">Loading signals...</td></tr>
             </tbody>
           </table>
@@ -3354,8 +3354,14 @@
             // ── Signals / alerts table ──────────────────────────────────────
             if (alertsResp.ok) {
               const signals = await alertsResp.json();
-              const tbody = document.querySelector("#signals-loading-row")?.closest("tbody")
-                         || document.querySelector("[data-page='signals'] table tbody");
+              // Use the stable tbody id — the previous fallback selector
+              // `[data-page='signals'] table tbody` would, after the first
+              // render removed `#signals-loading-row`, match the FIRST table
+              // inside Page 4 (the `.rm-formula-legend` xi / tier(xi) / wi
+              // legend), overwriting it with signal rows on every auto-refresh
+              // (e.g. after `visibilitychange` when the user returns from
+              // another tab). Targeting `#signals-tbody` avoids that.
+              const tbody = document.getElementById("signals-tbody");
               const topCount  = signals.filter(s => s.top).length;
               const botCount  = signals.filter(s => s.bottom).length;
               const topEl  = document.getElementById("top-score");
