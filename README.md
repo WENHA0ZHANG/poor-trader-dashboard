@@ -73,7 +73,7 @@ real market outcomes — not after-the-fact screenshots.
 </table>
 
 <p align="center">
-  <img src="docs/screenshot.png" alt="Poor Trader Dashboard — full page preview" width="95%" />
+  <img src="docs/screenshot.png" alt="Poor Trader Dashboard — full page preview" width="100%" />
 </p>
 
 ---
