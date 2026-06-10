@@ -85,9 +85,9 @@ function scoreOne(
     const pct = bp / 100;
     if (bp >= 700) return c("HY OAS", pct, "%", +3, `HY ${pct.toFixed(2)}% ≥ 7% credit panic`);
     if (bp >= 550) return c("HY OAS", pct, "%", +2, `HY ${pct.toFixed(2)}% ≥ 5.5% credit stress`);
-    if (bp >= 450) return c("HY OAS", pct, "%", +1, `HY ${pct.toFixed(2)}% ≥ 4.5% credit stress`);
+    if (bp >= 400) return c("HY OAS", pct, "%", +1, `HY ${pct.toFixed(2)}% ≥ 4.0% credit stress`);
     if (bp <= 250) return c("HY OAS", pct, "%", -2, `HY ${pct.toFixed(2)}% ≤ 2.5% credit complacency`);
-    if (bp <= 280) return c("HY OAS", pct, "%", -1, `HY ${pct.toFixed(2)}% ≤ 2.8% credit-greed`);
+    if (bp <= 270) return c("HY OAS", pct, "%", -1, `HY ${pct.toFixed(2)}% ≤ 2.7% credit-greed`);
     return c("HY OAS", pct, "%", 0, "HY OAS in normal range");
   }
 
@@ -100,22 +100,26 @@ function scoreOne(
   }
 
   if (id === "sp500_pe_ratio") {
-    if (v <= 18) return c("S&P 500 PE", v, "x", +2, `PE ${v.toFixed(1)}x ≤ 18 deep value`);
-    if (v <= 20) return c("S&P 500 PE", v, "x", +1, `PE ${v.toFixed(1)}x ≤ 20 cheap valuation`);
-    if (v >= 33) return c("S&P 500 PE", v, "x", -2, `PE ${v.toFixed(1)}x ≥ 33 extreme valuation`);
-    if (v >= 30) return c("S&P 500 PE", v, "x", -1, `PE ${v.toFixed(1)}x ≥ 30 expensive`);
+    if (v <= 22) return c("S&P 500 PE", v, "x", +2, `PE ${v.toFixed(1)}x ≤ 22 deep value`);
+    if (v <= 25) return c("S&P 500 PE", v, "x", +1, `PE ${v.toFixed(1)}x ≤ 25 cheap valuation`);
+    if (v >= 35) return c("S&P 500 PE", v, "x", -2, `PE ${v.toFixed(1)}x ≥ 35 extreme valuation`);
+    if (v >= 31) return c("S&P 500 PE", v, "x", -1, `PE ${v.toFixed(1)}x ≥ 31 expensive`);
     return c("S&P 500 PE", v, "x", 0, "PE in normal range");
   }
 
   if (id === "nasdaq100_pe_ratio") {
-    if (v < 22) return c("NDX 100 PE", v, "x", +1, `NDX PE ${v.toFixed(1)}x < 22 cheap`);
-    if (v > 35) return c("NDX 100 PE", v, "x", -1, `NDX PE ${v.toFixed(1)}x > 35 expensive`);
+    if (v <= 22) return c("NDX 100 PE", v, "x", +2, `NDX PE ${v.toFixed(1)}x ≤ 22 deep value`);
+    if (v <= 26) return c("NDX 100 PE", v, "x", +1, `NDX PE ${v.toFixed(1)}x ≤ 26 cheap`);
+    if (v >= 34) return c("NDX 100 PE", v, "x", -2, `NDX PE ${v.toFixed(1)}x ≥ 34 extreme valuation`);
+    if (v >= 30) return c("NDX 100 PE", v, "x", -1, `NDX PE ${v.toFixed(1)}x ≥ 30 expensive`);
     return c("NDX 100 PE", v, "x", 0, "NDX PE in normal range");
   }
 
   if (id === "cboe_skew") {
     if (v >= 160) return c("CBOE SKEW", v, "", -2, `SKEW ${v.toFixed(1)} ≥ 160 extreme tail-hedging`);
     if (v >= 155) return c("CBOE SKEW", v, "", -1, `SKEW ${v.toFixed(1)} ≥ 155 tail-hedging spike`);
+    if (v <= 130) return c("CBOE SKEW", v, "", +2, `SKEW ${v.toFixed(1)} ≤ 130 extreme complacency`);
+    if (v <= 135) return c("CBOE SKEW", v, "", +1, `SKEW ${v.toFixed(1)} ≤ 135 low tail-hedging`);
     return c("CBOE SKEW", v, "", 0, "SKEW in normal range");
   }
 

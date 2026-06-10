@@ -222,3 +222,87 @@ export async function upsertNewsCache(
     .bind(cacheKey, asOf, JSON.stringify(payload), now)
     .run();
 }
+
+// ── Watchlist (page 05) ──────────────────────────────────────────────────────
+
+export interface WatchlistRow {
+  symbol: string;
+  name: string | null;
+  note: string | null;
+  added_at: string;
+}
+
+export async function getWatchlist(db: D1Database): Promise<WatchlistRow[]> {
+  const rows = await db
+    .prepare(`SELECT symbol, name, note, added_at FROM watchlist ORDER BY added_at ASC`)
+    .all<WatchlistRow>();
+  return rows.results;
+}
+
+export async function addWatchlistSymbol(
+  db: D1Database,
+  symbol: string,
+  name: string | null,
+  note: string | null,
+): Promise<void> {
+  const now = new Date().toISOString();
+  await db
+    .prepare(
+      `INSERT INTO watchlist (symbol, name, note, added_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(symbol) DO UPDATE SET
+         name = COALESCE(excluded.name, watchlist.name),
+         note = COALESCE(excluded.note, watchlist.note)`,
+    )
+    .bind(symbol, name, note, now)
+    .run();
+}
+
+export async function removeWatchlistSymbol(db: D1Database, symbol: string): Promise<void> {
+  await db.batch([
+    db.prepare(`DELETE FROM watchlist WHERE symbol = ?`).bind(symbol),
+    db.prepare(`DELETE FROM watchlist_metrics WHERE symbol = ?`).bind(symbol),
+  ]);
+}
+
+export async function getWatchlistMetrics(
+  db: D1Database,
+  maxAgeSeconds = 86400,
+): Promise<{ map: Record<string, unknown>; freshest: number }> {
+  const rows = await db
+    .prepare(`SELECT symbol, payload_json, computed_at FROM watchlist_metrics`)
+    .all<{ symbol: string; payload_json: string; computed_at: string }>();
+  const map: Record<string, unknown> = {};
+  let freshest = 0;
+  for (const r of rows.results) {
+    const age = (Date.now() - new Date(r.computed_at).getTime()) / 1000;
+    if (age > maxAgeSeconds) continue;
+    try {
+      map[r.symbol] = JSON.parse(r.payload_json);
+      const t = new Date(r.computed_at).getTime();
+      if (t > freshest) freshest = t;
+    } catch { /* skip */ }
+  }
+  return { map, freshest };
+}
+
+export async function upsertWatchlistMetrics(
+  db: D1Database,
+  metrics: Array<{ symbol: string; focus_score: number; payload: unknown }>,
+): Promise<void> {
+  if (!metrics.length) return;
+  const now = new Date().toISOString();
+  const stmts = metrics.map((m) =>
+    db
+      .prepare(
+        `INSERT INTO watchlist_metrics (symbol, payload_json, focus_score, computed_at)
+         VALUES (?, ?, ?, ?)
+         ON CONFLICT(symbol) DO UPDATE SET
+           payload_json=excluded.payload_json,
+           focus_score=excluded.focus_score,
+           computed_at=excluded.computed_at`,
+      )
+      .bind(m.symbol, JSON.stringify(m.payload), m.focus_score, now),
+  );
+  await db.batch(stmts);
+}

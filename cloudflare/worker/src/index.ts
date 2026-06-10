@@ -10,10 +10,16 @@ import {
   upsertMarketOverviewRows,
   getNewsCacheEntry,
   upsertNewsCache,
+  getWatchlist,
+  addWatchlistSymbol,
+  removeWatchlistSymbol,
+  getWatchlistMetrics,
+  upsertWatchlistMetrics,
 } from "./lib/db";
 import { computeSignals } from "./lib/signals";
 import { computeMarketRegime } from "./lib/regime";
-import { fetchYahooChart } from "./lib/yahoo";
+import { fetchYahooChart, fetchYahooOHLCV } from "./lib/yahoo";
+import { computeMetrics, ema } from "./lib/analysis";
 import { fetchStooqDailyCloses, fetchStooqQuote } from "./lib/stooq";
 import { fetchCompanyNews, fetchGeneralNews, newsTickerForYahooSymbol } from "./lib/finnhub";
 import { fetchAllProviders } from "./lib/fetchers";
@@ -81,11 +87,11 @@ const INDICATOR_THRESHOLDS: Record<string, { top?: number; bottom?: number; top_
   cnn_put_call_options:   { top: 0.55, bottom: 0.95 },
   vix:                    { top: 14.0, bottom: 25.0 },
   sp500_rsi:              { top: 70.0, bottom: 30.0 },
-  sp500_pe_ratio:         { top: 30.0, bottom: 20.0 },
-  nasdaq100_pe_ratio:     { top: 35.0, bottom: 22.0 },
+  sp500_pe_ratio:         { top: 31.0, bottom: 25.0 },
+  nasdaq100_pe_ratio:     { top: 30.0, bottom: 26.0 },
   nasdaq100_above_20d_ma: { top: 80.0, bottom: 20.0 },
-  us_high_yield_spread:   { top: 2.8, bottom: 4.5 },
-  cboe_skew:              { top: 155.0 },
+  us_high_yield_spread:   { top: 2.7, bottom: 4.0 },
+  cboe_skew:              { top: 155.0, bottom: 135.0 },
   yc_10y_2y:              { top_zone: [-0.05, 0.6] },
 };
 
@@ -187,6 +193,34 @@ async function buildMarketRow(
   } catch {
     return null;
   }
+}
+
+// ── Watchlist metric builder (page 05) ───────────────────────────────────────
+// Pull ~2y of daily OHLCV from Yahoo for a single symbol and run the analysis
+// library over it. Returns null on a hard fetch failure.
+async function buildWatchMetrics(symbol: string, name: string | null) {
+  const yahooSym = symbol; // watchlist symbols are stored as plain Yahoo tickers
+  const bars = await fetchYahooOHLCV(yahooSym, "2y", "1d");
+  if (!bars.length) return null;
+  const m = computeMetrics(symbol, bars);
+  return { ...m, name: name ?? symbol };
+}
+
+async function refreshWatchlistMetrics(env: Env): Promise<number> {
+  const wl = await getWatchlist(env.DB);
+  if (!wl.length) return 0;
+  const settled = await Promise.allSettled(
+    wl.map((w) => buildWatchMetrics(w.symbol, w.name)),
+  );
+  const out: Array<{ symbol: string; focus_score: number; payload: unknown }> = [];
+  for (let i = 0; i < settled.length; i++) {
+    const r = settled[i];
+    if (r.status === "fulfilled" && r.value) {
+      out.push({ symbol: wl[i].symbol, focus_score: r.value.focus_score ?? 0, payload: r.value });
+    }
+  }
+  if (out.length) await upsertWatchlistMetrics(env.DB, out);
+  return out.length;
 }
 
 // ── Main fetch handler ────────────────────────────────────────────────────────
@@ -547,6 +581,126 @@ export default {
       return json({ articles: articles.slice(0, limit), symbol, date: dateStr, news_enabled: true });
     }
 
+    // ── /api/watchlist (GET / POST / DELETE) ────────────────────────────────
+    // Used by page 05 (Watchlist) for the user-curated stock repository.
+    if (pathname === "/api/watchlist") {
+      if (request.method === "GET") {
+        const force = url.searchParams.get("refresh") === "1";
+        const wl = await getWatchlist(env.DB);
+        let { map, freshest } = await getWatchlistMetrics(env.DB, force ? 0 : 24 * 3600);
+
+        // Compute on demand for any watchlist symbol whose cached metrics are
+        // missing or stale. We block on this so the client always renders a
+        // complete table; cap concurrency by relying on Promise.allSettled.
+        const missing = wl.filter((w) => !map[w.symbol]);
+        if (missing.length || force) {
+          const targets = force ? wl : missing;
+          const settled = await Promise.allSettled(
+            targets.map((w) => buildWatchMetrics(w.symbol, w.name)),
+          );
+          const writes: Array<{ symbol: string; focus_score: number; payload: unknown }> = [];
+          for (let i = 0; i < settled.length; i++) {
+            const r = settled[i];
+            if (r.status === "fulfilled" && r.value) {
+              map[targets[i].symbol] = r.value;
+              writes.push({ symbol: targets[i].symbol, focus_score: r.value.focus_score ?? 0, payload: r.value });
+            }
+          }
+          if (writes.length) {
+            ctx.waitUntil(upsertWatchlistMetrics(env.DB, writes));
+            freshest = Date.now();
+          }
+        }
+
+        const rows = wl.map((w) => {
+          const m = (map[w.symbol] as Record<string, unknown>) || null;
+          return {
+            symbol: w.symbol,
+            name: w.name || (m?.name as string) || w.symbol,
+            note: w.note,
+            added_at: w.added_at,
+            metrics: m,
+          };
+        });
+
+        // Special focus: anything with focus_score >= 4, sorted by score desc.
+        const focus = rows
+          .filter((r) => ((r.metrics as { focus_score?: number } | null)?.focus_score ?? 0) >= 4)
+          .sort((a, b) =>
+            ((b.metrics as { focus_score?: number } | null)?.focus_score ?? 0) -
+            ((a.metrics as { focus_score?: number } | null)?.focus_score ?? 0),
+          );
+
+        return json({
+          rows, focus,
+          computed_at: freshest ? new Date(freshest).toISOString() : null,
+        });
+      }
+
+      if (request.method === "POST") {
+        let body: { symbol?: string; name?: string; note?: string } = {};
+        try { body = await request.json(); } catch { return err("Invalid JSON body"); }
+        const sym = (body.symbol || "").trim().toUpperCase();
+        if (!sym || !/^[A-Z0-9][A-Z0-9.-]{0,9}$/.test(sym)) {
+          return err("Invalid symbol");
+        }
+        await addWatchlistSymbol(env.DB, sym, (body.name || sym).trim(), (body.note || "").trim() || null);
+        // Pre-warm metrics so the row shows up populated.
+        ctx.waitUntil((async () => {
+          const m = await buildWatchMetrics(sym, body.name || sym);
+          if (m) await upsertWatchlistMetrics(env.DB, [{ symbol: sym, focus_score: m.focus_score ?? 0, payload: m }]);
+        })());
+        return json({ ok: true, symbol: sym });
+      }
+
+      if (request.method === "DELETE") {
+        const sym = (url.searchParams.get("symbol") || "").trim().toUpperCase();
+        if (!sym) return err("Missing symbol");
+        await removeWatchlistSymbol(env.DB, sym);
+        return json({ ok: true });
+      }
+    }
+
+    // ── /api/watchlist/refresh ──────────────────────────────────────────────
+    if (pathname === "/api/watchlist/refresh" && request.method === "POST") {
+      const wrote = await refreshWatchlistMetrics(env);
+      return json({ ok: true, wrote });
+    }
+
+    // ── /api/stock-analysis ─────────────────────────────────────────────────
+    // Full bars + EMA/volume overlays + pattern annotation for the detail
+    // chart on page 05. Symbol here is a raw Yahoo ticker (no .US suffix).
+    if (pathname === "/api/stock-analysis" && request.method === "GET") {
+      const symbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
+      const range = url.searchParams.get("range") || "1y";
+      const validRanges = ["3mo", "6mo", "1y", "2y", "5y"];
+      const rng = validRanges.includes(range) ? range : "1y";
+      if (!symbol) return err("Missing symbol");
+
+      const bars = await fetchYahooOHLCV(symbol, rng, "1d");
+      if (!bars.length) return json({ symbol, range: rng, bars: [], metrics: null });
+
+      const closes = bars.map((b) => b.close);
+      const e8 = ema(closes, 8);
+      const e21 = ema(closes, 21);
+      const e50 = ema(closes, 50);
+
+      // Compute metrics over the full window (preferred 2y for stable ATR/RSI).
+      const fullBars = rng === "2y" || rng === "5y"
+        ? bars
+        : (await fetchYahooOHLCV(symbol, "2y", "1d")) || bars;
+      const metrics = computeMetrics(symbol, fullBars.length ? fullBars : bars);
+
+      return json({
+        symbol, range: rng,
+        bars: bars.map((b, i) => ({
+          date: b.date, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume,
+          ema8: e8[i], ema21: e21[i], ema50: e50[i],
+        })),
+        metrics,
+      });
+    }
+
     // ── /api/refresh (manual trigger, rate-limited per IP: 1 per 10 min) ────
     if (pathname === "/api/refresh" && request.method === "POST") {
       const clientIp = request.headers.get("CF-Connecting-IP") || "unknown";
@@ -685,6 +839,16 @@ export default {
           );
         } catch (e) {
           console.error("scheduled: market_overview refresh failed", e);
+        }
+
+        // 3b) Re-score the user watchlist (page 05). This is what lets the
+        //     "Special Focus" list surface volume surges, pattern breakouts,
+        //     etc. without the user having to open the page first.
+        try {
+          const n = await refreshWatchlistMetrics(env);
+          console.log(`scheduled: watchlist wrote=${n} (+${Date.now() - t0}ms)`);
+        } catch (e) {
+          console.error("scheduled: watchlist refresh failed", e);
         }
 
         // 4) Final heartbeat. Most ticks reach here; this updates the

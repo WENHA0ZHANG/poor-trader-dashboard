@@ -83,10 +83,10 @@ export function computeSignals(
     const v = sppe.value;
     out.push({
       indicator_id: "sp500_pe_ratio",
-      top: v >= 30,
-      bottom: v <= 20,
+      top: v >= 31,
+      bottom: v <= 25,
       title: "S&P 500 Price-to-Earnings Ratio",
-      detail: `${v.toFixed(2)}x (≥ 30 top valuation; ≤ 20 bottom valuation)`,
+      detail: `${v.toFixed(2)}x (≥ 31 top valuation; ≤ 25 bottom valuation)`,
     });
   }
 
@@ -96,10 +96,10 @@ export function computeSignals(
     const v = ndxpe.value;
     out.push({
       indicator_id: "nasdaq100_pe_ratio",
-      top: v > 35,
-      bottom: v < 22,
+      top: v >= 30,
+      bottom: v <= 26,
       title: "Nasdaq 100 Price-to-Earnings Ratio",
-      detail: `${v.toFixed(2)}x (> 35 top valuation; < 22 bottom valuation)`,
+      detail: `${v.toFixed(2)}x (≥ 30 top valuation; ≤ 26 bottom valuation)`,
     });
   }
 
@@ -124,10 +124,10 @@ export function computeSignals(
     const pct = bp / 100;
     out.push({
       indicator_id: "us_high_yield_spread",
-      top: bp < 280,
-      bottom: bp > 450,
+      top: bp < 270,
+      bottom: bp > 400,
       title: "US High Yield Option-Adjusted Spread",
-      detail: `Current ${pct.toFixed(2)}% (< 2.8% credit-greed top; > 4.5% credit-stress bottom)`,
+      detail: `Current ${pct.toFixed(2)}% (< 2.7% credit-greed top; > 4.0% credit-stress bottom)`,
     });
   }
 
@@ -138,9 +138,9 @@ export function computeSignals(
     out.push({
       indicator_id: "cboe_skew",
       top: v >= 155,
-      bottom: false,
+      bottom: v <= 135,
       title: "CBOE SKEW (Tail-Risk Hedging)",
-      detail: `${v.toFixed(1)} (≥ 155 institutional tail-hedging spike — top warning)`,
+      detail: `${v.toFixed(1)} (≥ 155 tail-hedging spike — top; ≤ 135 low hedging — bottom)`,
     });
   }
 

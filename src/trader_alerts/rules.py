@@ -101,8 +101,8 @@ def rule_bofa_bull_bear(ctx: RuleContext) -> Alert | None:
 def rule_hy_spread(ctx: RuleContext) -> Alert | None:
     """
     高收益债利差（OAS）常见阈值（经验）：
-    - >=500bp：信用压力显著 → 熊市预警
-    - <=300bp：信用环境偏好 → 牛市预警
+    - >=400bp：信用压力显著 → 熊市预警
+    - <=270bp：信用环境偏好 → 牛市预警
     - 1个月扩大 >=100bp：快速恶化 → 熊市预警
     - 1个月收窄 >=100bp：快速修复 → 牛市预警
     """
@@ -112,7 +112,7 @@ def rule_hy_spread(ctx: RuleContext) -> Alert | None:
     v = float(latest.value)
     d30 = _delta(ctx.history_365d, latest, 30)
 
-    if v >= 500 or (d30 is not None and d30 >= 100):
+    if v >= 400 or (d30 is not None and d30 >= 100):
         return Alert(
             indicator_id=IndicatorId.US_HIGH_YIELD_SPREAD,
             level=AlertLevel.BEAR,
@@ -121,7 +121,7 @@ def rule_hy_spread(ctx: RuleContext) -> Alert | None:
             evidence={"value": v, "unit": latest.unit, "delta_1m": d30},
         )
 
-    if v <= 300 or (d30 is not None and d30 <= -100):
+    if v <= 270 or (d30 is not None and d30 <= -100):
         return Alert(
             indicator_id=IndicatorId.US_HIGH_YIELD_SPREAD,
             level=AlertLevel.BULL,

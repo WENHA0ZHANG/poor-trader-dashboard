@@ -866,6 +866,295 @@
         background: var(--neutral-soft);
         border-color: var(--border-strong);
       }
+
+      /* ───────── Page 05: Watchlist ───────── */
+      .wl-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+        gap: 14px;
+        align-items: start;
+      }
+      @media (max-width: 1024px) { .wl-grid { grid-template-columns: 1fr; } }
+
+      .wl-focus-card {
+        border: 1px solid var(--border);
+        background: linear-gradient(180deg, rgba(251, 191, 36, 0.06), rgba(0,0,0,0));
+      }
+      .wl-focus-card h2 .wl-focus-icon {
+        display: inline-block; width: 8px; height: 8px;
+        border-radius: 50%; background: var(--warning);
+        box-shadow: 0 0 12px var(--warning);
+        margin-right: 8px; vertical-align: middle;
+        animation: wl-pulse 1.8s infinite ease-in-out;
+      }
+      @keyframes wl-pulse {
+        0%, 100% { opacity: 0.6; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.35); }
+      }
+      .wl-focus-empty {
+        padding: 20px 18px; color: var(--muted); font-size: 12px;
+        text-align: center;
+      }
+      .wl-focus-list {
+        display: grid; grid-template-columns: 1fr; gap: 8px;
+        padding: 12px 14px 14px;
+      }
+      .wl-focus-item {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+        gap: 10px;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        background: var(--panel);
+        align-items: center;
+        cursor: pointer;
+        transition: border-color 0.15s, background 0.15s;
+      }
+      .wl-focus-item:hover { border-color: var(--border-strong); background: var(--panel2); }
+      .wl-focus-item.is-hot {
+        border-color: rgba(251, 191, 36, 0.5);
+        background: linear-gradient(180deg, rgba(251, 191, 36, 0.12), var(--panel));
+        box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.18), 0 4px 16px rgba(0,0,0,0.4);
+      }
+      .wl-focus-item .wl-sym {
+        font-weight: 700; font-size: 14px; color: var(--text-strong);
+        letter-spacing: 0.02em;
+      }
+      .wl-focus-item .wl-sym .wl-price {
+        font-weight: 500; color: var(--muted); font-size: 12px; margin-left: 6px;
+      }
+      .wl-focus-item .wl-tags {
+        display: flex; flex-wrap: wrap; gap: 4px;
+      }
+      .wl-tag {
+        display: inline-block;
+        padding: 2px 6px;
+        font-size: 9.5px; letter-spacing: 0.05em;
+        font-weight: 600; text-transform: uppercase;
+        border: 1px solid var(--border-strong);
+        border-radius: 2px;
+        color: var(--muted);
+      }
+      .wl-tag.t-vol { color: var(--warning); border-color: rgba(251, 191, 36, 0.55); background: var(--warning-soft); }
+      .wl-tag.t-vol2 { color: #fde68a; border-color: rgba(251, 191, 36, 0.9); background: rgba(251, 191, 36, 0.22); }
+      .wl-tag.t-htf { color: var(--bull); border-color: rgba(34, 197, 94, 0.6); background: var(--bull-soft); }
+      .wl-tag.t-bull { color: var(--bull); border-color: rgba(34, 197, 94, 0.4); }
+      .wl-tag.t-hve { color: var(--accent); border-color: rgba(96, 165, 250, 0.5); }
+      .wl-tag.t-ext { color: var(--bear); border-color: rgba(239, 68, 68, 0.5); background: var(--bear-soft); }
+      .wl-tag.t-trend { color: var(--neutral); }
+
+      .wl-focus-item .wl-chg { text-align: right; font-weight: 600; font-size: 13px; }
+      .wl-focus-item .wl-chg.up { color: var(--bull); }
+      .wl-focus-item .wl-chg.down { color: var(--bear); }
+      .wl-focus-item .wl-chg .wl-volr {
+        display: block; font-size: 10px; font-weight: 500;
+        color: var(--muted); margin-top: 2px;
+      }
+
+      /* Watchlist table */
+      .wl-table-card .wl-add-row {
+        display: flex; gap: 8px; padding: 10px 14px 0;
+        align-items: center; flex-wrap: wrap;
+      }
+      .wl-table-card .wl-add-row input {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        color: var(--text);
+        padding: 6px 10px;
+        border-radius: 3px;
+        font-family: inherit;
+        font-size: 12px;
+        min-width: 90px;
+      }
+      .wl-table-card .wl-add-row input:focus {
+        outline: none; border-color: var(--border-strong);
+      }
+      .wl-table-card .wl-add-row button {
+        background: var(--text-strong);
+        color: #050505;
+        border: 0;
+        padding: 6px 14px;
+        border-radius: 3px;
+        font-family: inherit;
+        font-weight: 600;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        cursor: pointer;
+      }
+      .wl-table-card .wl-add-row button:hover { background: var(--accent); color: #050505; }
+      .wl-table-card .wl-add-status {
+        font-size: 11px; color: var(--muted); margin-left: auto;
+      }
+      .wl-table-card .wl-add-status.err { color: var(--bear); }
+      .wl-table-card table { margin-top: 10px; }
+      .wl-table-card td, .wl-table-card th {
+        padding: 8px 10px;
+        font-size: 12px;
+        text-align: right;
+      }
+      .wl-table-card th { white-space: nowrap; }
+      .wl-table-card td:first-child, .wl-table-card th:first-child {
+        text-align: left;
+      }
+      .wl-table-card tr.wl-row { cursor: pointer; }
+      .wl-table-card tr.wl-row:hover td { background: rgba(255,255,255,0.04); }
+      .wl-table-card tr.wl-row.is-active td {
+        background: rgba(96, 165, 250, 0.10);
+        box-shadow: inset 2px 0 0 var(--accent);
+      }
+      .wl-table-card tr.wl-row.is-hot td {
+        background: rgba(251, 191, 36, 0.08);
+      }
+      .wl-table-card .wl-vr-bad { color: var(--warning); font-weight: 700; }
+      .wl-table-card .wl-vr-up { color: var(--bull); font-weight: 600; }
+      .wl-table-card .wl-sym-cell { font-weight: 700; color: var(--text-strong); }
+      .wl-table-card .wl-sym-cell small { color: var(--muted); font-weight: 400; margin-left: 4px; }
+      .wl-table-card .wl-rm-btn {
+        background: transparent; border: 0; color: var(--muted);
+        cursor: pointer; font-size: 14px; padding: 0 4px;
+        line-height: 1;
+      }
+      .wl-table-card .wl-rm-btn:hover { color: var(--bear); }
+
+      /* Detail card */
+      .wl-detail-card { position: sticky; top: 12px; align-self: start; }
+      .wl-detail-empty {
+        padding: 60px 22px; text-align: center; color: var(--muted); font-size: 12px;
+      }
+      .wl-detail-header {
+        padding: 14px 18px 4px;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: end;
+      }
+      .wl-detail-header .wd-name {
+        font-size: 22px; font-weight: 700; color: var(--text-strong);
+        letter-spacing: -0.01em;
+      }
+      .wl-detail-header .wd-name small {
+        font-weight: 400; color: var(--muted); margin-left: 8px;
+        font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
+      }
+      .wl-detail-header .wd-price {
+        font-size: 28px; font-weight: 600; color: var(--text-strong);
+      }
+      .wl-detail-header .wd-chg {
+        font-size: 12px; font-weight: 600;
+        margin-top: 4px; text-align: right;
+      }
+      .wl-detail-header .wd-chg.up { color: var(--bull); }
+      .wl-detail-header .wd-chg.down { color: var(--bear); }
+
+      .wl-key-metrics {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        padding: 12px 18px 4px;
+      }
+      .wl-key-metrics .kv {
+        background: var(--panel2);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 8px 10px;
+      }
+      .wl-key-metrics .kv .kv-label {
+        font-size: 10px; color: var(--muted); text-transform: uppercase;
+        letter-spacing: 0.06em; margin-bottom: 3px;
+      }
+      .wl-key-metrics .kv .kv-value {
+        font-size: 14px; font-weight: 600; color: var(--text-strong);
+      }
+      .wl-key-metrics .kv .kv-sub {
+        font-size: 10px; color: var(--muted); margin-top: 1px;
+      }
+
+      .wl-plan-banner {
+        margin: 8px 18px 0;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        background: var(--panel2);
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        font-size: 12px;
+      }
+      .wl-plan-banner .pb-cell .pb-label {
+        font-size: 10px; color: var(--muted);
+        text-transform: uppercase; letter-spacing: 0.06em;
+      }
+      .wl-plan-banner .pb-cell .pb-value { font-weight: 700; font-size: 14px; }
+      .wl-plan-banner .pb-cell.stop .pb-value { color: var(--bear); }
+      .wl-plan-banner .pb-cell.tp1 .pb-value { color: var(--bull); }
+      .wl-plan-banner .pb-cell.tp2 .pb-value { color: var(--bull); }
+
+      .wl-pattern-pill {
+        display: inline-block;
+        font-size: 10.5px; font-weight: 700;
+        padding: 3px 8px;
+        border-radius: 2px;
+        text-transform: uppercase; letter-spacing: 0.05em;
+        margin-left: 8px;
+        background: var(--bull-soft); color: var(--bull);
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        vertical-align: middle;
+      }
+
+      .wl-detail-controls {
+        display: flex; gap: 4px; padding: 8px 18px 0;
+      }
+      .wl-detail-controls button {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--muted);
+        font-family: inherit;
+        font-size: 11px;
+        padding: 4px 10px;
+        cursor: pointer;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        border-radius: 2px;
+      }
+      .wl-detail-controls button.active {
+        background: var(--text-strong); color: #050505; border-color: var(--text-strong);
+      }
+      .wl-detail-controls button:hover { color: var(--text); }
+      .wl-detail-chart-wrap { padding: 8px 14px 6px; }
+      #wl-detail-chart { width: 100%; height: 380px; }
+      #wl-detail-vol { width: 100%; height: 90px; margin-top: -8px; }
+
+      .wl-legend {
+        display: flex; gap: 14px; padding: 4px 18px 14px;
+        font-size: 11px; color: var(--muted); flex-wrap: wrap;
+      }
+      .wl-legend .lg-dot {
+        display: inline-block; width: 10px; height: 2px; vertical-align: middle;
+        margin-right: 4px;
+      }
+      .wl-legend .lg-dot.e8 { background: #60a5fa; }
+      .wl-legend .lg-dot.e21 { background: #fbbf24; }
+      .wl-legend .lg-dot.e50 { background: #a78bfa; }
+      .wl-legend .lg-dot.stop { background: var(--bear); }
+      .wl-legend .lg-dot.tp { background: var(--bull); }
+      .wl-legend .lg-dot.pivot { background: #d4d4d4; }
+
+      .wl-intro {
+        padding: 12px 18px;
+        color: var(--muted);
+        font-size: 11.5px;
+        line-height: 1.6;
+        border-bottom: 1px solid var(--border);
+      }
+      .wl-intro b { color: var(--text); font-weight: 600; }
+      .wl-glossary {
+        display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 14px;
+        margin-top: 6px;
+      }
+      .wl-glossary .gl-item code {
+        color: var(--text-strong); font-weight: 600; margin-right: 4px;
+      }
     </style>
   </head>
   <body>
@@ -900,6 +1189,9 @@
         </button>
         <button class="tab-btn" data-tab="signals" role="tab" aria-selected="false">
           <span class="tab-num">04</span>Signals &amp; History
+        </button>
+        <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false">
+          <span class="tab-num">05</span>Watchlist
         </button>
         <div class="navbar-clock" id="navbar-clock" aria-hidden="true">
           <span class="clock-date" id="clock-date">--</span>
@@ -1149,7 +1441,7 @@
                 <tr><td>0.7</td><td>AAII Bull-Bear</td><td>Noisy weekly survey</td></tr>
                 <tr><td>0.7</td><td>S&amp;P 500 RSI</td><td>Price momentum</td></tr>
                 <tr><td>0.7</td><td>NDX 100 PE</td><td>Less standard</td></tr>
-                <tr><td>0.6</td><td>CBOE SKEW</td><td>Indirect, top-only</td></tr>
+                <tr><td>0.6</td><td>CBOE SKEW</td><td>Indirect, top ≥155 / bottom ≤135</td></tr>
               </tbody>
             </table>
           </div>
@@ -1216,6 +1508,109 @@
           </tbody>
         </table>
         <div class="empty">Note: Historical comparison table is a hardcoded snapshot (for comparison and rule backtesting), data compiled from Federal Reserve FRED (HY Spread), AAII (Sentiment), CNN (Fear & Greed), Multpl (SP500 PE). CNN data not available before 2012.</div>
+      </div>
+      </section>
+
+      <!-- ============== Page 5: Watchlist (Swing-trading assistant) ============== -->
+      <section class="page" data-page="watchlist" role="tabpanel">
+      <div class="card" style="margin-bottom: 14px;">
+        <div class="wl-intro">
+          A swing-trading assistant for your own stock repository. Add tickers below;
+          the dashboard re-scans them every ~30&nbsp;min and surfaces names that look
+          interesting — <b>2&times; (or more) average daily volume</b>, fresh all-time
+          volume highs, tight high-base consolidations, etc. — at the very top.
+          Click any row to see the chart with annotated EMA8 / EMA21 / EMA50, a
+          suggested stop and two partial-profit targets, and any detected base
+          structure. <i>This is an analytics aid only, not investment advice.</i>
+          <div class="wl-glossary">
+            <div class="gl-item"><code>LOD</code> Low of Day</div>
+            <div class="gl-item"><code>ADR</code> Average Daily Range</div>
+            <div class="gl-item"><code>ATR</code> Average True Range</div>
+            <div class="gl-item"><code>RSI</code> Relative Strength Index (14)</div>
+            <div class="gl-item"><code>HVE</code> Highest Volume Ever (in window)</div>
+            <div class="gl-item"><code>HTF</code> High Tight Flag (heuristic)</div>
+            <div class="gl-item"><code>VolR</code> Today's volume vs. prior 21-day average</div>
+            <div class="gl-item"><code>Stop / TP1 / TP2</code> Suggested stop and +3R / +5R targets</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card wl-focus-card" style="margin-bottom: 14px;">
+        <h2><span class="wl-focus-icon"></span>Today's Special Focus
+          <span class="meta" id="wl-focus-meta" style="float:right; font-weight:400;">—</span>
+        </h2>
+        <div id="wl-focus-empty" class="wl-focus-empty">No watchlist names trigger the focus criteria right now.</div>
+        <div id="wl-focus-list" class="wl-focus-list" style="display:none;"></div>
+      </div>
+
+      <div class="wl-grid">
+        <div class="card wl-table-card">
+          <h2>My Watchlist
+            <a href="#" id="wl-reload-link" onclick="loadWatchlist(true); return false;">Reload</a>
+          </h2>
+          <div class="wl-add-row">
+            <input id="wl-add-symbol" type="text" placeholder="Ticker (e.g. NVDA)" maxlength="10" autocomplete="off" />
+            <input id="wl-add-note" type="text" placeholder="Optional note" maxlength="60" />
+            <button onclick="addWatchlistSymbol(); return false;">Add</button>
+            <span class="wl-add-status" id="wl-add-status"></span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Price</th>
+                <th>1D</th>
+                <th>1W</th>
+                <th>1M</th>
+                <th>VolR</th>
+                <th>ADR%</th>
+                <th>RSI</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="wl-tbody">
+              <tr><td colspan="9" class="meta">Loading watchlist...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="card wl-detail-card" id="wl-detail-card">
+          <div id="wl-detail-empty" class="wl-detail-empty">
+            Pick a stock from your watchlist on the left to see the chart, key
+            metrics and a suggested swing plan.
+          </div>
+          <div id="wl-detail-body" style="display:none;">
+            <div class="wl-detail-header">
+              <div>
+                <div class="wd-name"><span id="wd-name">—</span><small id="wd-meta"></small><span id="wd-pattern"></span></div>
+              </div>
+              <div>
+                <div class="wd-price" id="wd-price">—</div>
+                <div class="wd-chg" id="wd-chg"></div>
+              </div>
+            </div>
+            <div class="wl-key-metrics" id="wl-key-metrics"></div>
+            <div class="wl-plan-banner" id="wl-plan-banner"></div>
+            <div class="wl-detail-controls" id="wl-detail-controls">
+              <button data-range="3mo">3M</button>
+              <button data-range="6mo">6M</button>
+              <button data-range="1y" class="active">1Y</button>
+              <button data-range="2y">2Y</button>
+            </div>
+            <div class="wl-detail-chart-wrap">
+              <div id="wl-detail-chart"></div>
+              <div id="wl-detail-vol"></div>
+            </div>
+            <div class="wl-legend">
+              <span><span class="lg-dot e8"></span>EMA 8</span>
+              <span><span class="lg-dot e21"></span>EMA 21</span>
+              <span><span class="lg-dot e50"></span>EMA 50</span>
+              <span><span class="lg-dot stop"></span>Stop</span>
+              <span><span class="lg-dot tp"></span>TP1 / TP2</span>
+              <span><span class="lg-dot pivot"></span>Base / Pivot</span>
+            </div>
+          </div>
+        </div>
       </div>
       </section>
 
@@ -3066,8 +3461,544 @@
           });
         }
 
+        // ============================================================
+        // ---- Page 05: Watchlist (Swing-trading assistant) ----------
+        // ============================================================
+        let wlData = { rows: [], focus: [] };
+        let wlDetailChart = null;
+        let wlVolChart = null;
+        let wlCurrentSymbol = null;
+        let wlCurrentName = null;
+        let wlCurrentRange = "1y";
+        let wlInited = false;
+
+        const WL_TAG_LABELS = {
+          VOL_DOUBLED: { label: "Vol 2×+", cls: "t-vol2" },
+          VOL_SURGE:   { label: "Vol Up",  cls: "t-vol" },
+          HVE:         { label: "HVE",     cls: "t-hve" },
+          HTF:         { label: "HTF",     cls: "t-htf" },
+          BULL_FLAG:   { label: "Bull Flag", cls: "t-bull" },
+          STRONG_1M:   { label: "+30% 1M", cls: "t-trend" },
+          TREND_UP:    { label: "Up Trend", cls: "t-trend" },
+          EXTENDED:    { label: "Extended", cls: "t-ext" },
+        };
+
+        function _wlFmt(v, digits = 2) {
+          if (v === null || v === undefined || Number.isNaN(Number(v))) return "—";
+          return Number(v).toFixed(digits);
+        }
+        function _wlFmtPct(v) {
+          if (v === null || v === undefined || Number.isNaN(Number(v))) return "—";
+          const n = Number(v);
+          return (n >= 0 ? "+" : "") + n.toFixed(2) + "%";
+        }
+        function _wlFmtVol(v) {
+          if (!v) return "—";
+          const n = Number(v);
+          if (n >= 1e9) return (n / 1e9).toFixed(2) + "B";
+          if (n >= 1e6) return (n / 1e6).toFixed(2) + "M";
+          if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+          return String(Math.round(n));
+        }
+        function _wlChgClass(v) {
+          if (v === null || v === undefined || Number.isNaN(Number(v))) return "";
+          return Number(v) >= 0 ? "up" : "down";
+        }
+        function _wlVolRClass(v) {
+          if (v == null) return "";
+          const n = Number(v);
+          if (n >= 2) return "wl-vr-bad";
+          if (n >= 1.5) return "wl-vr-up";
+          return "";
+        }
+
+        function _wlBuildTags(reasons) {
+          if (!reasons || !reasons.length) return "";
+          return reasons.map(r => {
+            const t = WL_TAG_LABELS[r];
+            if (!t) return "";
+            return `<span class="wl-tag ${t.cls}">${t.label}</span>`;
+          }).join("");
+        }
+
+        async function loadWatchlist(force) {
+          const tbody = document.getElementById("wl-tbody");
+          if (!tbody) return;
+          if (!wlData.rows.length) {
+            tbody.innerHTML = `<tr><td colspan="9" class="meta">Loading…</td></tr>`;
+          }
+          try {
+            const url = `${window.API_BASE||""}/api/watchlist${force ? "?refresh=1" : ""}`;
+            const resp = await fetch(url);
+            if (!resp.ok) {
+              tbody.innerHTML = `<tr><td colspan="9" class="meta">Failed to load watchlist.</td></tr>`;
+              return;
+            }
+            wlData = await resp.json();
+            renderWatchlistTable();
+            renderWatchlistFocus();
+            // Refresh the currently-selected detail row inline.
+            if (wlCurrentSymbol) {
+              const r = (wlData.rows || []).find(r => r.symbol === wlCurrentSymbol);
+              if (r) renderWatchlistDetailHeader(r);
+            }
+          } catch (e) {
+            tbody.innerHTML = `<tr><td colspan="9" class="meta">Network error.</td></tr>`;
+          }
+        }
+
+        function renderWatchlistFocus() {
+          const wrap = document.getElementById("wl-focus-list");
+          const empty = document.getElementById("wl-focus-empty");
+          const meta = document.getElementById("wl-focus-meta");
+          if (!wrap) return;
+          const focus = wlData.focus || [];
+          const computed = wlData.computed_at
+            ? new Date(wlData.computed_at).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })
+            : "—";
+          meta.textContent = `Updated ${computed} · ${focus.length} flagged`;
+          if (!focus.length) {
+            wrap.style.display = "none";
+            empty.style.display = "block";
+            return;
+          }
+          empty.style.display = "none";
+          wrap.style.display = "grid";
+          wrap.innerHTML = focus.map(r => {
+            const m = r.metrics || {};
+            const reasons = m.focus_reasons || [];
+            const hot = (m.focus_score || 0) >= 6 || reasons.includes("VOL_DOUBLED");
+            const chg = m.chg_1d_pct;
+            const chgCls = _wlChgClass(chg);
+            return `<div class="wl-focus-item ${hot ? "is-hot" : ""}" data-sym="${r.symbol}">
+              <div class="wl-sym">${r.symbol}<span class="wl-price">${_wlFmt(m.price)}</span></div>
+              <div class="wl-tags">${_wlBuildTags(reasons)}</div>
+              <div class="wl-chg ${chgCls}">${_wlFmtPct(chg)}
+                <span class="wl-volr">VolR ${_wlFmt(m.vol_ratio, 2)}×</span></div>
+            </div>`;
+          }).join("");
+          wrap.querySelectorAll(".wl-focus-item").forEach(el => {
+            el.addEventListener("click", () => loadWatchlistDetail(el.dataset.sym));
+          });
+        }
+
+        function renderWatchlistTable() {
+          const tbody = document.getElementById("wl-tbody");
+          if (!tbody) return;
+          const rows = wlData.rows || [];
+          if (!rows.length) {
+            tbody.innerHTML = `<tr><td colspan="9" class="meta">No tickers yet — add one above.</td></tr>`;
+            return;
+          }
+          // Sort: hot first, then alphabetical.
+          const sorted = rows.slice().sort((a, b) => {
+            const sa = (a.metrics && a.metrics.focus_score) || 0;
+            const sb = (b.metrics && b.metrics.focus_score) || 0;
+            if (sa !== sb) return sb - sa;
+            return a.symbol.localeCompare(b.symbol);
+          });
+          tbody.innerHTML = sorted.map(r => {
+            const m = r.metrics || {};
+            const isActive = r.symbol === wlCurrentSymbol;
+            const isHot = (m.focus_score || 0) >= 4;
+            const chg1d = m.chg_1d_pct;
+            const chg1w = m.chg_1w_pct;
+            const chg1m = m.chg_1m_pct;
+            return `<tr class="wl-row ${isActive ? "is-active" : ""} ${isHot ? "is-hot" : ""}" data-sym="${r.symbol}">
+              <td class="wl-sym-cell">${r.symbol}${r.note ? `<small>${_escHtml(r.note)}</small>` : ""}</td>
+              <td>${_wlFmt(m.price)}</td>
+              <td class="${_wlChgClass(chg1d)}" style="color:${_chgColor(chg1d)}">${_wlFmtPct(chg1d)}</td>
+              <td class="${_wlChgClass(chg1w)}" style="color:${_chgColor(chg1w)}">${_wlFmtPct(chg1w)}</td>
+              <td class="${_wlChgClass(chg1m)}" style="color:${_chgColor(chg1m)}">${_wlFmtPct(chg1m)}</td>
+              <td class="${_wlVolRClass(m.vol_ratio)}">${m.vol_ratio == null ? "—" : _wlFmt(m.vol_ratio, 2) + "×"}</td>
+              <td>${m.adr_pct == null ? "—" : _wlFmt(m.adr_pct, 2) + "%"}</td>
+              <td>${_wlFmt(m.rsi, 1)}</td>
+              <td><button class="wl-rm-btn" title="Remove" data-rm="${r.symbol}">×</button></td>
+            </tr>`;
+          }).join("");
+          tbody.querySelectorAll(".wl-row").forEach(tr => {
+            tr.addEventListener("click", (ev) => {
+              if (ev.target && ev.target.classList && ev.target.classList.contains("wl-rm-btn")) return;
+              loadWatchlistDetail(tr.dataset.sym);
+            });
+          });
+          tbody.querySelectorAll(".wl-rm-btn").forEach(btn => {
+            btn.addEventListener("click", (ev) => {
+              ev.stopPropagation();
+              removeWatchlistSymbol(btn.dataset.rm);
+            });
+          });
+        }
+
+        async function addWatchlistSymbol() {
+          const inp = document.getElementById("wl-add-symbol");
+          const noteInp = document.getElementById("wl-add-note");
+          const status = document.getElementById("wl-add-status");
+          const raw = (inp.value || "").trim().toUpperCase();
+          status.classList.remove("err");
+          if (!raw || !/^[A-Z0-9][A-Z0-9.-]{0,9}$/.test(raw)) {
+            status.textContent = "Enter a valid ticker (e.g. NVDA, BRK-B).";
+            status.classList.add("err");
+            return;
+          }
+          status.textContent = "Adding…";
+          try {
+            const resp = await fetch(`${window.API_BASE||""}/api/watchlist`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ symbol: raw, note: (noteInp.value || "").trim() }),
+            });
+            if (!resp.ok) {
+              const body = await resp.json().catch(() => ({}));
+              status.textContent = body.error || "Failed to add.";
+              status.classList.add("err");
+              return;
+            }
+            inp.value = "";
+            noteInp.value = "";
+            status.textContent = `Added ${raw}. Scoring…`;
+            await loadWatchlist(false);
+            // Auto-select the newly-added symbol.
+            loadWatchlistDetail(raw);
+            status.textContent = `Added ${raw}.`;
+            setTimeout(() => { status.textContent = ""; }, 3000);
+          } catch (e) {
+            status.textContent = "Network error.";
+            status.classList.add("err");
+          }
+        }
+
+        async function removeWatchlistSymbol(sym) {
+          if (!sym) return;
+          if (!confirm(`Remove ${sym} from your watchlist?`)) return;
+          try {
+            await fetch(`${window.API_BASE||""}/api/watchlist?symbol=${encodeURIComponent(sym)}`, { method: "DELETE" });
+            if (wlCurrentSymbol === sym) {
+              wlCurrentSymbol = null;
+              document.getElementById("wl-detail-body").style.display = "none";
+              document.getElementById("wl-detail-empty").style.display = "block";
+            }
+            loadWatchlist(false);
+          } catch (e) { /* ignore */ }
+        }
+
+        function renderWatchlistDetailHeader(r) {
+          const m = r.metrics || {};
+          document.getElementById("wd-name").textContent = r.symbol;
+          document.getElementById("wd-meta").textContent = (r.name && r.name !== r.symbol) ? r.name : "";
+          document.getElementById("wd-price").textContent = m.price == null ? "—" : _wlFmt(m.price);
+          const chg = m.chg_1d_pct;
+          const chgEl = document.getElementById("wd-chg");
+          chgEl.textContent = _wlFmtPct(chg) + " today";
+          chgEl.className = "wd-chg " + _wlChgClass(chg);
+
+          // Pattern pill
+          const pp = document.getElementById("wd-pattern");
+          if (m.high_tight_flag) {
+            pp.innerHTML = `<span class="wl-pattern-pill">High-Tight Base</span>`;
+          } else if (m.bull_flag) {
+            pp.innerHTML = `<span class="wl-pattern-pill">Bull-Flag Base</span>`;
+          } else {
+            pp.innerHTML = "";
+          }
+
+          // Key metrics grid
+          const kv = document.getElementById("wl-key-metrics");
+          kv.innerHTML = [
+            ["LOD",  _wlFmt(m.lod),                 "Today's low"],
+            ["HOD",  _wlFmt(m.hod),                 "Today's high"],
+            ["ADR",  m.adr_pct == null ? "—" : _wlFmt(m.adr_pct, 2) + "%", "20-day range"],
+            ["ATR",  _wlFmt(m.atr, 2),              m.atr_pct == null ? "" : `${_wlFmt(m.atr_pct, 1)}%`],
+            ["RSI",  _wlFmt(m.rsi, 1),              "14-day"],
+            ["VolR", m.vol_ratio == null ? "—" : _wlFmt(m.vol_ratio, 2) + "×", `Today vs prior 21d avg`],
+            ["Vol Today", _wlFmtVol(m.vol_today),   "Shares"],
+            ["Avg $ Vol", _wlFmtVol(m.dollar_vol),  "Liquidity proxy"],
+          ].map(([label, value, sub]) => `<div class="kv">
+            <div class="kv-label">${label}</div>
+            <div class="kv-value">${value}</div>
+            ${sub ? `<div class="kv-sub">${sub}</div>` : ""}
+          </div>`).join("");
+
+          // Plan banner
+          const pb = document.getElementById("wl-plan-banner");
+          if (m.stop != null && m.tp1 != null) {
+            const rr = m.risk != null ? (3).toFixed(0) : "3";
+            pb.innerHTML = `
+              <div class="pb-cell stop">
+                <div class="pb-label">Suggested Stop</div>
+                <div class="pb-value">${_wlFmt(m.stop)}</div>
+                <div class="kv-sub" style="color: var(--muted);">-${_wlFmt(m.stop_pct, 2)}% · risk ${_wlFmt(m.risk)}</div>
+              </div>
+              <div class="pb-cell tp1">
+                <div class="pb-label">TP1 (+3R · trim 1/4 – 1/3)</div>
+                <div class="pb-value">${_wlFmt(m.tp1)}</div>
+                <div class="kv-sub" style="color: var(--muted);">Move stop to breakeven</div>
+              </div>
+              <div class="pb-cell tp2">
+                <div class="pb-label">TP2 (+5R · trim again)</div>
+                <div class="pb-value">${_wlFmt(m.tp2)}</div>
+                <div class="kv-sub" style="color: var(--muted);">Trail remainder by EMA 8 / 21</div>
+              </div>`;
+          } else {
+            pb.innerHTML = `<div class="pb-cell" style="grid-column: 1/-1; color: var(--muted); text-align: center;">No price data — plan unavailable.</div>`;
+          }
+        }
+
+        async function loadWatchlistDetail(symbol, range) {
+          if (!symbol) return;
+          wlCurrentSymbol = symbol;
+          if (range) wlCurrentRange = range;
+          document.getElementById("wl-detail-empty").style.display = "none";
+          document.getElementById("wl-detail-body").style.display = "block";
+
+          // Highlight active row & focus card
+          document.querySelectorAll(".wl-row").forEach(tr =>
+            tr.classList.toggle("is-active", tr.dataset.sym === symbol));
+
+          // Initial header from cached metrics (fast paint)
+          const cached = (wlData.rows || []).find(r => r.symbol === symbol);
+          if (cached) {
+            renderWatchlistDetailHeader(cached);
+            wlCurrentName = cached.name || symbol;
+          }
+
+          // Range buttons
+          document.querySelectorAll("#wl-detail-controls button").forEach(b =>
+            b.classList.toggle("active", b.dataset.range === wlCurrentRange));
+
+          try {
+            const url = `${window.API_BASE||""}/api/stock-analysis?symbol=${encodeURIComponent(symbol)}&range=${encodeURIComponent(wlCurrentRange)}`;
+            const resp = await fetch(url);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const m = data.metrics;
+            if (m && cached) {
+              // Merge fresh metrics into the cached row's display
+              cached.metrics = m;
+              renderWatchlistDetailHeader(cached);
+            }
+            renderWatchlistChart(data);
+          } catch (e) { /* ignore */ }
+        }
+
+        function _wlInitCharts() {
+          if (wlInited) return;
+          const el = document.getElementById("wl-detail-chart");
+          const elV = document.getElementById("wl-detail-vol");
+          if (!el || !elV || typeof echarts === "undefined") return;
+          wlDetailChart = echarts.init(el, null, { renderer: "canvas" });
+          wlVolChart = echarts.init(elV, null, { renderer: "canvas" });
+          window.addEventListener("resize", () => {
+            try { wlDetailChart && wlDetailChart.resize(); } catch (e) {}
+            try { wlVolChart && wlVolChart.resize(); } catch (e) {}
+          });
+          // Link cursors across the price/volume panes.
+          echarts.connect([wlDetailChart, wlVolChart]);
+          wlInited = true;
+        }
+
+        function renderWatchlistChart(data) {
+          _wlInitCharts();
+          if (!wlDetailChart || !wlVolChart) return;
+          const bars = (data && data.bars) || [];
+          const m = (data && data.metrics) || {};
+          if (!bars.length) {
+            wlDetailChart.clear();
+            wlVolChart.clear();
+            wlDetailChart.setOption({
+              title: { text: "No price data", left: "center", top: "middle",
+                       textStyle: { color: "#737373", fontSize: 13 } },
+            });
+            return;
+          }
+          const dates = bars.map(b => b.date);
+          const ohlc = bars.map(b => [b.open, b.close, b.low, b.high]);
+          const vols = bars.map((b) => ({
+            value: b.volume || 0,
+            itemStyle: { color: (b.close >= b.open) ? "rgba(34,197,94,0.55)" : "rgba(239,68,68,0.55)" },
+          }));
+          const ema8  = bars.map(b => b.ema8  != null && !Number.isNaN(b.ema8)  ? Math.round(b.ema8  * 100) / 100 : null);
+          const ema21 = bars.map(b => b.ema21 != null && !Number.isNaN(b.ema21) ? Math.round(b.ema21 * 100) / 100 : null);
+          const ema50 = bars.map(b => b.ema50 != null && !Number.isNaN(b.ema50) ? Math.round(b.ema50 * 100) / 100 : null);
+
+          // Avg-volume reference line over the visible window (20-bar rolling).
+          const volAvg = [];
+          for (let i = 0; i < bars.length; i++) {
+            const lo = Math.max(0, i - 19);
+            const slice = bars.slice(lo, i + 1);
+            const valid = slice.map(b => b.volume || 0).filter(v => v > 0);
+            volAvg.push(valid.length ? Math.round(valid.reduce((s, v) => s + v, 0) / valid.length) : null);
+          }
+
+          // Stop / TP / pivot markings (anchored at the latest date).
+          const last = bars[bars.length - 1];
+          const markLines = [];
+          if (m.stop != null) markLines.push({ name: "Stop", yAxis: m.stop, lineStyle: { color: "#ef4444", type: "dashed", width: 1 }, label: { formatter: `Stop ${m.stop}`, color: "#ef4444", position: "insideEndTop", fontSize: 10 } });
+          if (m.tp1 != null) markLines.push({ name: "TP1", yAxis: m.tp1, lineStyle: { color: "#22c55e", type: "dashed", width: 1 }, label: { formatter: `TP1 ${m.tp1}`, color: "#22c55e", position: "insideEndTop", fontSize: 10 } });
+          if (m.tp2 != null) markLines.push({ name: "TP2", yAxis: m.tp2, lineStyle: { color: "#22c55e", type: "dotted", width: 1 }, label: { formatter: `TP2 ${m.tp2}`, color: "#22c55e", position: "insideEndTop", fontSize: 10 } });
+          if (m.pivot != null) markLines.push({ name: "Pivot", yAxis: m.pivot, lineStyle: { color: "#d4d4d4", type: "dotted", width: 1 }, label: { formatter: `Pivot ${m.pivot}`, color: "#d4d4d4", position: "insideEndTop", fontSize: 10 } });
+
+          // Highlight the detected base region.
+          const markAreas = [];
+          const pat = m.pattern;
+          if (pat && pat.flag_start && pat.flag_end) {
+            markAreas.push([
+              { name: pat.high_tight_flag ? "High-Tight Base" : "Base", xAxis: pat.flag_start,
+                itemStyle: { color: pat.high_tight_flag ? "rgba(34,197,94,0.10)" : "rgba(96,165,250,0.08)" },
+                label: { show: true, color: "#a3a3a3", fontSize: 10, position: "insideTop" } },
+              { xAxis: pat.flag_end },
+            ]);
+          }
+
+          wlDetailChart.setOption({
+            backgroundColor: "transparent",
+            animation: false,
+            tooltip: {
+              trigger: "axis",
+              axisPointer: { type: "cross", lineStyle: { color: "#525252", type: "dashed" } },
+              backgroundColor: "rgba(20, 20, 20, 0.95)",
+              borderColor: "#3f3f3f",
+              textStyle: { color: "#e5e5e5", fontSize: 12 },
+              formatter: (params) => {
+                if (!params || !params.length) return "";
+                const date = params[0].axisValue;
+                let html = `<div style="font-size:11px;color:#a3a3a3;margin-bottom:4px;">${date}</div>`;
+                params.forEach(p => {
+                  if (p.seriesName === "OHLC") {
+                    const v = p.data;
+                    const op = v[1], cp = v[2], lo = v[3], hi = v[4];
+                    const color = cp >= op ? "#22c55e" : "#ef4444";
+                    html += `<div style="display:flex;justify-content:space-between;gap:14px;">
+                      <span>O</span><span>${op.toFixed(2)}</span></div>
+                      <div style="display:flex;justify-content:space-between;gap:14px;">
+                      <span>H</span><span>${hi.toFixed(2)}</span></div>
+                      <div style="display:flex;justify-content:space-between;gap:14px;">
+                      <span>L</span><span>${lo.toFixed(2)}</span></div>
+                      <div style="display:flex;justify-content:space-between;gap:14px;font-weight:600;">
+                      <span>C</span><span style="color:${color};">${cp.toFixed(2)}</span></div>`;
+                  } else if (p.value != null) {
+                    html += `<div style="display:flex;justify-content:space-between;gap:14px;">
+                      <span style="color:${p.color};">${p.seriesName}</span>
+                      <span>${Number(p.value).toFixed(2)}</span></div>`;
+                  }
+                });
+                return html;
+              },
+            },
+            grid: { left: 55, right: 16, top: 18, bottom: 28 },
+            xAxis: {
+              type: "category", data: dates,
+              axisLine: { lineStyle: { color: "#3f3f3f" } },
+              axisLabel: { color: "#a3a3a3", fontSize: 11, hideOverlap: true,
+                formatter: (v) => v ? v.slice(0, 7) : "" },
+              splitLine: { show: false },
+              axisTick: { show: false },
+            },
+            yAxis: {
+              type: "value", scale: true, splitNumber: 5,
+              axisLine: { show: false },
+              axisLabel: { color: "#a3a3a3", fontSize: 11 },
+              splitLine: { lineStyle: { color: "#262626", type: "dashed" } },
+            },
+            series: [
+              {
+                name: "OHLC", type: "candlestick", data: ohlc,
+                itemStyle: {
+                  color: "#22c55e", color0: "#ef4444",
+                  borderColor: "#22c55e", borderColor0: "#ef4444",
+                },
+                markLine: {
+                  symbol: "none",
+                  data: markLines,
+                  silent: true,
+                },
+                markArea: {
+                  silent: true,
+                  data: markAreas,
+                },
+              },
+              { name: "EMA 8",  type: "line", data: ema8,  showSymbol: false, lineStyle: { color: "#60a5fa", width: 1.2 }, smooth: false },
+              { name: "EMA 21", type: "line", data: ema21, showSymbol: false, lineStyle: { color: "#fbbf24", width: 1.2 }, smooth: false },
+              { name: "EMA 50", type: "line", data: ema50, showSymbol: false, lineStyle: { color: "#a78bfa", width: 1.2 }, smooth: false },
+            ],
+          }, true);
+
+          wlVolChart.setOption({
+            backgroundColor: "transparent",
+            animation: false,
+            tooltip: {
+              trigger: "axis",
+              axisPointer: { type: "line", lineStyle: { color: "#525252", type: "dashed" } },
+              backgroundColor: "rgba(20, 20, 20, 0.95)",
+              borderColor: "#3f3f3f",
+              textStyle: { color: "#e5e5e5", fontSize: 12 },
+              formatter: (params) => {
+                if (!params || !params.length) return "";
+                const date = params[0].axisValue;
+                let html = `<div style="font-size:11px;color:#a3a3a3;margin-bottom:4px;">${date}</div>`;
+                params.forEach(p => {
+                  if (p.value != null) {
+                    html += `<div style="display:flex;justify-content:space-between;gap:14px;">
+                      <span style="color:${p.color};">${p.seriesName}</span>
+                      <span>${_wlFmtVol(p.value)}</span></div>`;
+                  }
+                });
+                return html;
+              },
+            },
+            grid: { left: 55, right: 16, top: 6, bottom: 22 },
+            xAxis: {
+              type: "category", data: dates,
+              axisLine: { lineStyle: { color: "#3f3f3f" } },
+              axisLabel: { color: "#a3a3a3", fontSize: 10, hideOverlap: true,
+                formatter: (v) => v ? v.slice(5) : "" },
+              splitLine: { show: false },
+              axisTick: { show: false },
+            },
+            yAxis: {
+              type: "value", scale: true,
+              axisLine: { show: false },
+              axisLabel: { color: "#a3a3a3", fontSize: 10,
+                formatter: (v) => _wlFmtVol(v) },
+              splitLine: { lineStyle: { color: "#262626", type: "dashed" } },
+            },
+            series: [
+              { name: "Volume", type: "bar", data: vols, barCategoryGap: "20%" },
+              { name: "Avg(20)", type: "line", data: volAvg, showSymbol: false,
+                lineStyle: { color: "#fbbf24", width: 1, type: "dashed" } },
+            ],
+          }, true);
+          wlDetailChart.resize();
+          wlVolChart.resize();
+        }
+
+        function initWatchlist() {
+          // Range buttons
+          document.querySelectorAll("#wl-detail-controls button").forEach(btn => {
+            btn.addEventListener("click", () => {
+              const r = btn.dataset.range;
+              if (!r || r === wlCurrentRange) return;
+              if (wlCurrentSymbol) loadWatchlistDetail(wlCurrentSymbol, r);
+              else wlCurrentRange = r;
+            });
+          });
+          // Enter-to-add
+          const inp = document.getElementById("wl-add-symbol");
+          if (inp) {
+            inp.addEventListener("keydown", (ev) => {
+              if (ev.key === "Enter") { ev.preventDefault(); addWatchlistSymbol(); }
+            });
+            // Uppercase as the user types.
+            inp.addEventListener("input", () => { inp.value = inp.value.toUpperCase(); });
+          }
+        }
+
+        // Expose for inline onclick handlers.
+        window.loadWatchlist = loadWatchlist;
+        window.addWatchlistSymbol = addWatchlistSymbol;
+
         // ---- Tab navigation ----
-        const TAB_IDS = ["prediction", "market", "global", "signals"];
+        const TAB_IDS = ["prediction", "market", "global", "signals", "watchlist"];
         const DEFAULT_TAB = "prediction";
 
         function switchTab(name, push) {
@@ -3090,7 +4021,14 @@
             try { if (indexDetailChart) indexDetailChart.resize(); } catch (e) {}
             try { if (indicatorChart) indicatorChart.resize(); } catch (e) {}
             try { if (stockDetailChart) stockDetailChart.resize(); } catch (e) {}
+            try { if (wlDetailChart) wlDetailChart.resize(); } catch (e) {}
+            try { if (wlVolChart) wlVolChart.resize(); } catch (e) {}
           });
+          // Lazy-init watchlist charts the first time the tab is shown so
+          // ECharts measures the correct container dimensions.
+          if (name === "watchlist" && wlCurrentSymbol) {
+            requestAnimationFrame(() => loadWatchlistDetail(wlCurrentSymbol));
+          }
         }
 
         function initTabs() {
@@ -3148,6 +4086,8 @@
           loadWorldIndices(false);
           loadIndicators();
           loadSignalsAndRegime();
+          initWatchlist();
+          loadWatchlist(false);
 
           // ── Background auto-refresh ───────────────────────────────────────
           // Pull whatever the Worker (cron) has already written into D1.
@@ -3165,6 +4105,7 @@
                 typeof loadIndicators === "function" ? loadIndicators() : null,
                 typeof loadSignalsAndRegime === "function" ? loadSignalsAndRegime() : null,
                 typeof loadMarketOverview === "function" ? loadMarketOverview() : null,
+                typeof loadWatchlist === "function" ? loadWatchlist(false) : null,
               ]);
             } catch (e) {
               console.error("autoRefreshTick:", e);

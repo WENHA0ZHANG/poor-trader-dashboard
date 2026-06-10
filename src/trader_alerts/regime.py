@@ -68,8 +68,8 @@ from .models import Observation
 #   0.7  RSI           Pure price momentum — easily mean-reverting,
 #                      doesn't add much beyond VIX/breadth.
 #   0.7  NDX PE        Less standard, sparser history.
-#   0.6  CBOE SKEW     Top-only, indirect, structurally elevated since
-#                      2020 so the threshold is a moving target.
+#   0.6  CBOE SKEW     Indirect; top ≥155 tail-hedging spike,
+#                      bottom ≤135 low hedging (complacency).
 #
 INDICATOR_WEIGHT: dict[IndicatorId, float] = {
     IndicatorId.VIX:                   1.5,
@@ -163,9 +163,9 @@ def _score_one(o: Observation, *, recently_inverted: bool) -> _IndicatorContribu
         pct = bp / 100.0
         if bp >= 700: return _c(ind, "HY OAS", pct, "%", +3, w, f"HY {pct:.2f}% ≥7% credit panic")
         if bp >= 550: return _c(ind, "HY OAS", pct, "%", +2, w, f"HY {pct:.2f}% ≥5.5% credit stress")
-        if bp >= 450: return _c(ind, "HY OAS", pct, "%", +1, w, f"HY {pct:.2f}% ≥4.5% credit stress")
+        if bp >= 400: return _c(ind, "HY OAS", pct, "%", +1, w, f"HY {pct:.2f}% ≥4.0% credit stress")
         if bp <= 250: return _c(ind, "HY OAS", pct, "%", -2, w, f"HY {pct:.2f}% ≤2.5% credit complacency")
-        if bp <= 280: return _c(ind, "HY OAS", pct, "%", -1, w, f"HY {pct:.2f}% ≤2.8% credit-greed")
+        if bp <= 270: return _c(ind, "HY OAS", pct, "%", -1, w, f"HY {pct:.2f}% ≤2.7% credit-greed")
         return _c(ind, "HY OAS", pct, "%", 0, w, "HY OAS in normal range")
 
     # ---- Nasdaq 100 % Above 20-Day MA ------------------------------------
@@ -178,22 +178,26 @@ def _score_one(o: Observation, *, recently_inverted: bool) -> _IndicatorContribu
 
     # ---- S&P 500 trailing PE ---------------------------------------------
     if ind == IndicatorId.SP500_PE_RATIO:
-        if v <= 18:   return _c(ind, "S&P 500 PE", v, "x", +2, w, f"PE {v:.1f}x ≤18 deep value")
-        if v <= 20:   return _c(ind, "S&P 500 PE", v, "x", +1, w, f"PE {v:.1f}x ≤20 cheap valuation")
-        if v >= 33:   return _c(ind, "S&P 500 PE", v, "x", -2, w, f"PE {v:.1f}x ≥33 extreme valuation")
-        if v >= 30:   return _c(ind, "S&P 500 PE", v, "x", -1, w, f"PE {v:.1f}x ≥30 expensive")
+        if v <= 22:   return _c(ind, "S&P 500 PE", v, "x", +2, w, f"PE {v:.1f}x ≤22 deep value")
+        if v <= 25:   return _c(ind, "S&P 500 PE", v, "x", +1, w, f"PE {v:.1f}x ≤25 cheap valuation")
+        if v >= 35:   return _c(ind, "S&P 500 PE", v, "x", -2, w, f"PE {v:.1f}x ≥35 extreme valuation")
+        if v >= 31:   return _c(ind, "S&P 500 PE", v, "x", -1, w, f"PE {v:.1f}x ≥31 expensive")
         return _c(ind, "S&P 500 PE", v, "x", 0, w, "PE in normal range")
 
     # ---- Nasdaq 100 trailing PE ------------------------------------------
     if ind == IndicatorId.NASDAQ100_PE_RATIO:
-        if v <  22:   return _c(ind, "NDX 100 PE", v, "x", +1, w, f"NDX PE {v:.1f}x <22 cheap")
-        if v >  35:   return _c(ind, "NDX 100 PE", v, "x", -1, w, f"NDX PE {v:.1f}x >35 expensive")
+        if v <= 22:   return _c(ind, "NDX 100 PE", v, "x", +2, w, f"NDX PE {v:.1f}x ≤22 deep value")
+        if v <= 26:   return _c(ind, "NDX 100 PE", v, "x", +1, w, f"NDX PE {v:.1f}x ≤26 cheap")
+        if v >= 34:   return _c(ind, "NDX 100 PE", v, "x", -2, w, f"NDX PE {v:.1f}x ≥34 extreme valuation")
+        if v >= 30:   return _c(ind, "NDX 100 PE", v, "x", -1, w, f"NDX PE {v:.1f}x ≥30 expensive")
         return _c(ind, "NDX 100 PE", v, "x", 0, w, "NDX PE in normal range")
 
-    # ---- CBOE SKEW (top-only) --------------------------------------------
+    # ---- CBOE SKEW --------------------------------------------------------
     if ind == IndicatorId.CBOE_SKEW:
         if v >= 160:  return _c(ind, "CBOE SKEW", v, "", -2, w, f"SKEW {v:.1f} ≥160 extreme tail-hedging")
         if v >= 155:  return _c(ind, "CBOE SKEW", v, "", -1, w, f"SKEW {v:.1f} ≥155 tail-hedging spike")
+        if v <= 130:  return _c(ind, "CBOE SKEW", v, "", +2, w, f"SKEW {v:.1f} ≤130 extreme complacency")
+        if v <= 135:  return _c(ind, "CBOE SKEW", v, "", +1, w, f"SKEW {v:.1f} ≤135 low tail-hedging")
         return _c(ind, "CBOE SKEW", v, "", 0, w, "SKEW in normal range")
 
     # ---- 10Y-2Y yield curve (re-steepening top window) -------------------

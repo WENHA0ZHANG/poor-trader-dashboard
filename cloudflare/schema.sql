@@ -38,3 +38,21 @@ CREATE TABLE IF NOT EXISTS kv_store (
   value TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+
+-- ── Watchlist (page 05) ──────────────────────────────────────────────────────
+-- User-curated stock repository. `symbol` is normalized (e.g. "NVDA").
+CREATE TABLE IF NOT EXISTS watchlist (
+  symbol TEXT PRIMARY KEY,
+  name TEXT,
+  note TEXT,
+  added_at TEXT NOT NULL
+);
+
+-- Cached computed metrics for each watchlist symbol (refreshed by cron / on
+-- demand). `payload_json` holds the full WatchMetrics object.
+CREATE TABLE IF NOT EXISTS watchlist_metrics (
+  symbol TEXT PRIMARY KEY,
+  payload_json TEXT NOT NULL,
+  focus_score INTEGER NOT NULL DEFAULT 0,
+  computed_at TEXT NOT NULL
+);

@@ -686,11 +686,11 @@ def create_app(
             IndicatorId.CNN_PUT_CALL_OPTIONS: {"top": 0.55, "bottom": 0.95},
             IndicatorId.VIX: {"top": 14.0, "bottom": 25.0},
             IndicatorId.SP500_RSI: {"top": 70.0, "bottom": 30.0},
-            IndicatorId.SP500_PE_RATIO: {"top": 30.0, "bottom": 20.0},
-            IndicatorId.NASDAQ100_PE_RATIO: {"top": 35.0, "bottom": 22.0},
+            IndicatorId.SP500_PE_RATIO: {"top": 31.0, "bottom": 25.0},
+            IndicatorId.NASDAQ100_PE_RATIO: {"top": 30.0, "bottom": 26.0},
             IndicatorId.NASDAQ100_ABOVE_20D_MA: {"top": 80.0, "bottom": 20.0},
-            IndicatorId.US_HIGH_YIELD_SPREAD: {"top": 2.8, "bottom": 4.5},
-            IndicatorId.CBOE_SKEW: {"top": 155.0},
+            IndicatorId.US_HIGH_YIELD_SPREAD: {"top": 2.7, "bottom": 4.0},
+            IndicatorId.CBOE_SKEW: {"top": 155.0, "bottom": 135.0},
             # 10Y-2Y is special: the "top warning" is a BAND (post-inversion
             # re-steepening window), not a single threshold. We emit a
             # `top_zone` instead of a `top` here. There is no clean single
