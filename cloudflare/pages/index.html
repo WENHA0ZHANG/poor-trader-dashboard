@@ -902,6 +902,22 @@
         .wl-side .wl-timing-grid { grid-template-columns: 1fr; }
       }
 
+      /* Height of the left cards is locked (via JS) to their right-hand
+         neighbours; overflowing content scrolls inside the card. */
+      .wl-top-grid .wl-focus-card,
+      .wl-bottom-grid .wl-table-card {
+        display: flex; flex-direction: column; min-height: 0;
+      }
+      .wl-top-grid .wl-focus-card > h2,
+      .wl-bottom-grid .wl-table-card > h2,
+      .wl-bottom-grid .wl-table-card > .wl-add-row { flex: 0 0 auto; }
+      .wl-top-grid .wl-focus-list,
+      .wl-top-grid .wl-focus-empty { overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+      .wl-table-scroll { overflow-y: auto; min-height: 0; flex: 1 1 auto; }
+      .wl-table-card thead th {
+        position: sticky; top: 0; background: var(--panel); z-index: 2;
+      }
+
       /* Market timing tiles (SPY / QQQ) */
       .wl-timing-grid {
         display: grid;
@@ -1109,7 +1125,7 @@
       .wl-table-card .wl-rm-btn:hover { color: var(--bear); }
 
       /* Detail card */
-      .wl-detail-card { position: sticky; top: 12px; align-self: start; }
+      .wl-detail-card { align-self: start; }
       .wl-detail-empty {
         padding: 60px 22px; text-align: center; color: var(--muted); font-size: 12px;
       }
@@ -1691,6 +1707,7 @@
             <button onclick="addWatchlistSymbol(); return false;">Add</button>
             <span class="wl-add-status" id="wl-add-status"></span>
           </div>
+          <div class="wl-table-scroll">
           <table>
             <thead>
               <tr>
@@ -1709,6 +1726,7 @@
               <tr><td colspan="9" class="meta">Loading watchlist...</td></tr>
             </tbody>
           </table>
+          </div>
         </div>
 
         <div class="wl-side">
@@ -3682,7 +3700,12 @@
             if (wlCurrentSymbol) {
               const r = (wlData.rows || []).find(r => r.symbol === wlCurrentSymbol);
               if (r) renderWatchlistDetailHeader(r);
+            } else if ((wlData.rows || []).length) {
+              // Default the detail chart to the first watchlist name so the
+              // panel is never an empty placeholder.
+              loadWatchlistDetail(wlData.rows[0].symbol);
             }
+            _wlSyncHeights();
           } catch (e) {
             tbody.innerHTML = `<tr><td colspan="9" class="meta">Network error.</td></tr>`;
           }
@@ -3775,6 +3798,7 @@
                 <div class="wt-note">${stackTxt}. ${noteMap[r.tier] || ""}</div>
               </div>`;
             }).join("");
+            _wlSyncHeights();
           } catch (e) { /* ignore */ }
         }
 
@@ -4024,7 +4048,16 @@
           window.addEventListener("resize", () => {
             try { wlDetailChart && wlDetailChart.resize(); } catch (e) {}
             try { wlVolChart && wlVolChart.resize(); } catch (e) {}
+            _wlSyncHeights();
           });
+          // Auto-relock left-card heights whenever the right-hand cards change.
+          if (typeof ResizeObserver !== "undefined") {
+            const ro = new ResizeObserver(() => _wlSyncHeights());
+            const detail = document.getElementById("wl-detail-card");
+            const side = document.querySelector(".wl-side");
+            if (detail) ro.observe(detail);
+            if (side) ro.observe(side);
+          }
           // Link cursors across the price/volume panes.
           echarts.connect([wlDetailChart, wlVolChart]);
           wlInited = true;
@@ -4243,6 +4276,37 @@
           }, true);
           wlDetailChart.resize();
           wlVolChart.resize();
+          _wlSyncHeights();
+        }
+
+        // Keep the left cards' heights locked to their right-hand neighbours:
+        //  • Today's Special Focus  ==  chart detail card height
+        //  • My Watchlist           ==  (Market Timing + glossary) column height
+        // Overflowing content then scrolls inside the card.
+        let _wlSyncRaf = 0;
+        function _wlSyncHeights() {
+          cancelAnimationFrame(_wlSyncRaf);
+          _wlSyncRaf = requestAnimationFrame(() => {
+            const focus = document.querySelector(".wl-focus-card");
+            const detail = document.getElementById("wl-detail-card");
+            const table = document.querySelector(".wl-table-card");
+            const side = document.querySelector(".wl-side");
+            // Only lock heights in the wide two-column layout.
+            const twoCol = window.matchMedia("(min-width: 1025px)").matches;
+            if (!twoCol) {
+              if (focus) focus.style.height = "";
+              if (table) table.style.height = "";
+              return;
+            }
+            // Skip while the tab is hidden (offsetHeight === 0), otherwise we
+            // would lock the cards to zero height.
+            if (focus && detail && detail.offsetHeight > 0) {
+              focus.style.height = detail.offsetHeight + "px";
+            }
+            if (table && side && side.offsetHeight > 0) {
+              table.style.height = side.offsetHeight + "px";
+            }
+          });
         }
 
         function initWatchlist() {
@@ -4296,6 +4360,7 @@
             try { if (stockDetailChart) stockDetailChart.resize(); } catch (e) {}
             try { if (wlDetailChart) wlDetailChart.resize(); } catch (e) {}
             try { if (wlVolChart) wlVolChart.resize(); } catch (e) {}
+            if (name === "watchlist") { try { _wlSyncHeights(); } catch (e) {} }
           });
           // Lazy-init watchlist charts the first time the tab is shown so
           // ECharts measures the correct container dimensions.
