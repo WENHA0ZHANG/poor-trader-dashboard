@@ -3,6 +3,62 @@ interface YahooChartPoint {
   close: number;
 }
 
+export interface YahooNewsArticle {
+  title: string;
+  url: string;
+  source: string;
+  summary: string;
+  datetime: string;
+  ts: number;
+}
+
+/**
+ * Fetch news headlines from Yahoo Finance's public search endpoint. No API key
+ * required, so this works as a reliable fallback when Finnhub returns nothing.
+ */
+export async function fetchYahooNews(query: string, count = 12): Promise<YahooNewsArticle[]> {
+  const url = new URL("https://query1.finance.yahoo.com/v1/finance/search");
+  url.searchParams.set("q", query);
+  url.searchParams.set("newsCount", String(count));
+  url.searchParams.set("quotesCount", "0");
+  url.searchParams.set("enableFuzzyQuery", "false");
+
+  try {
+    const resp = await fetch(url.toString(), {
+      headers: { "User-Agent": "Mozilla/5.0", Accept: "application/json" },
+      cf: { cacheTtl: 600, cacheEverything: false },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!resp.ok) return [];
+    const data = await resp.json() as {
+      news?: Array<{
+        title?: string; link?: string; publisher?: string;
+        providerPublishTime?: number; uuid?: string;
+      }>;
+    };
+    const news = data?.news ?? [];
+    const out: YahooNewsArticle[] = [];
+    const seen = new Set<string>();
+    for (const n of news) {
+      const title = (n.title ?? "").trim();
+      const link = (n.link ?? "").trim();
+      if (!title || !link || seen.has(title)) continue;
+      seen.add(title);
+      const ts = Number(n.providerPublishTime ?? 0) || 0;
+      let iso = "";
+      if (ts > 0) { try { iso = new Date(ts * 1000).toISOString(); } catch { /* noop */ } }
+      out.push({
+        title, url: link, source: (n.publisher ?? "").trim(),
+        summary: "", datetime: iso, ts,
+      });
+      if (out.length >= count) break;
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchYahooChart(
   symbol: string,
   range = "1y",
@@ -117,6 +173,10 @@ export async function fetchYahooOHLCV(
     const closes = q.close ?? [];
     const vols = q.volume ?? [];
 
+    // Intraday intervals (e.g. 30m, 60m, 1h, 90m) need the time-of-day kept
+    // on the label; daily / weekly / monthly only need the calendar date.
+    const isIntraday = /\d+\s*m$|h$/i.test(interval) && interval !== "1mo" && interval !== "3mo";
+
     const out: YahooBar[] = [];
     for (let i = 0; i < ts.length; i++) {
       const c = closes[i];
@@ -124,8 +184,9 @@ export async function fetchYahooOHLCV(
       const l = lows[i];
       const o = opens[i];
       if (c == null || h == null || l == null || o == null) continue;
+      const iso = new Date(ts[i] * 1000).toISOString();
       out.push({
-        date: new Date(ts[i] * 1000).toISOString().slice(0, 10),
+        date: isIntraday ? iso.slice(0, 16).replace("T", " ") : iso.slice(0, 10),
         open: o, high: h, low: l, close: c,
         volume: vols[i] ?? 0,
       });

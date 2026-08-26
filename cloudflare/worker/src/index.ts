@@ -18,7 +18,7 @@ import {
 } from "./lib/db";
 import { computeSignals } from "./lib/signals";
 import { computeMarketRegime } from "./lib/regime";
-import { fetchYahooChart, fetchYahooOHLCV } from "./lib/yahoo";
+import { fetchYahooChart, fetchYahooOHLCV, fetchYahooNews } from "./lib/yahoo";
 import { computeMetrics, ema } from "./lib/analysis";
 import { fetchStooqDailyCloses, fetchStooqQuote } from "./lib/stooq";
 import { fetchCompanyNews, fetchGeneralNews, newsTickerForYahooSymbol } from "./lib/finnhub";
@@ -193,6 +193,79 @@ async function buildMarketRow(
   } catch {
     return null;
   }
+}
+
+// ── Watchlist defaults (page 05) ─────────────────────────────────────────────
+// Seeded once into D1 the first time the watchlist is read while empty.
+const WATCHLIST_DEFAULTS = [
+  "NVO", "AAPL", "GOOG", "NVDA", "TSLA", "META", "MSFT",
+  "HOOD", "MU", "BRK-B", "RKLB", "AMZN", "KO",
+];
+
+async function seedDefaultWatchlistIfEmpty(env: Env): Promise<boolean> {
+  // A kv flag means we only ever auto-seed once — so deliberately clearing
+  // the whole list later won't keep re-filling it.
+  const flag = await env.DB.prepare(
+    "SELECT value FROM kv_store WHERE key = 'watchlist_seeded'",
+  ).first<{ value: string }>();
+  if (flag) return false;
+
+  const now = new Date().toISOString();
+  const stmts = WATCHLIST_DEFAULTS.map((s) =>
+    env.DB.prepare(
+      `INSERT INTO watchlist (symbol, name, note, added_at)
+       VALUES (?, ?, NULL, ?) ON CONFLICT(symbol) DO NOTHING`,
+    ).bind(s, s, now),
+  );
+  stmts.push(
+    env.DB.prepare(
+      `INSERT INTO kv_store (key, value, updated_at)
+       VALUES ('watchlist_seeded', '1', datetime('now'))
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    ),
+  );
+  await env.DB.batch(stmts);
+  return true;
+}
+
+// ── Market-timing tiles (page 05) ────────────────────────────────────────────
+// Generic trend read on SPY & QQQ (price vs 21 EMA, 8/21/50 EMA stack) — the
+// "is this a friendly environment?" gauge at the top of the page. No
+// proprietary methodology text is reproduced.
+async function buildMarketTiming(yahooSym: string, name: string) {
+  const bars = await fetchYahooOHLCV(yahooSym, "1y", "1d");
+  if (bars.length < 60) return { symbol: yahooSym, name, ok: false } as Record<string, unknown>;
+  const closes = bars.map((b) => b.close);
+  const e8 = ema(closes, 8);
+  const e21 = ema(closes, 21);
+  const e50 = ema(closes, 50);
+  const n = bars.length;
+  const price = closes[n - 1];
+  const prev = closes[n - 2];
+  const ema8v = e8[n - 1], ema21v = e21[n - 1], ema50v = e50[n - 1];
+
+  const above21 = price > ema21v;
+  const stacked = ema8v > ema21v && ema21v > ema50v;
+  const rising21 = ema21v > e21[n - 6];
+
+  let status: string;
+  let tier: string;
+  if (above21 && stacked && rising21) { status = "Risk-On"; tier = "on"; }
+  else if (above21 && ema8v > ema21v) { status = "Constructive"; tier = "mild"; }
+  else if (above21) { status = "Mixed"; tier = "neutral"; }
+  else { status = "Risk-Off"; tier = "off"; }
+
+  return {
+    symbol: yahooSym, name, ok: true,
+    price: Math.round(price * 100) / 100,
+    chg_1d_pct: prev ? Math.round((price / prev - 1) * 10000) / 100 : null,
+    ema8: Math.round(ema8v * 100) / 100,
+    ema21: Math.round(ema21v * 100) / 100,
+    ema50: Math.round(ema50v * 100) / 100,
+    above_21ema: above21,
+    stacked,
+    status, tier,
+  } as Record<string, unknown>;
 }
 
 // ── Watchlist metric builder (page 05) ───────────────────────────────────────
@@ -412,11 +485,16 @@ export default {
         const todayStr = new Date().toISOString().slice(0, 10);
         const fromStr = new Date(Date.now() - 30 * 86400 * 1000).toISOString().slice(0, 10);
         const cached = await getNewsCacheEntry(env.DB, `stock:${newsTicker}`, todayStr, 3600);
-        if (cached) {
+        if (cached && cached.length) {
           articles = cached;
         } else {
           articles = await fetchCompanyNews(newsTicker, fromStr, todayStr, env.FINNHUB_KEY!);
-          ctx.waitUntil(upsertNewsCache(env.DB, `stock:${newsTicker}`, todayStr, articles));
+          if (!articles.length) {
+            articles = await fetchYahooNews(newsTicker, 8);
+          }
+          if (articles.length) {
+            ctx.waitUntil(upsertNewsCache(env.DB, `stock:${newsTicker}`, todayStr, articles));
+          }
         }
       }
 
@@ -586,6 +664,7 @@ export default {
     if (pathname === "/api/watchlist") {
       if (request.method === "GET") {
         const force = url.searchParams.get("refresh") === "1";
+        await seedDefaultWatchlistIfEmpty(env);
         const wl = await getWatchlist(env.DB);
         let { map, freshest } = await getWatchlistMetrics(env.DB, force ? 0 : 24 * 3600);
 
@@ -667,32 +746,96 @@ export default {
       return json({ ok: true, wrote });
     }
 
+    // ── /api/market-timing ──────────────────────────────────────────────────
+    // SPY + QQQ trend gauge shown at the top of page 05.
+    if (pathname === "/api/market-timing" && request.method === "GET") {
+      const settled = await Promise.allSettled([
+        buildMarketTiming("SPY", "S&P 500 · SPY"),
+        buildMarketTiming("QQQ", "Nasdaq 100 · QQQ"),
+        buildMarketTiming("DIA", "Dow 30 · DIA"),
+      ]);
+      const rows = settled.map((r) => (r.status === "fulfilled" ? r.value : { ok: false }));
+      return json({ rows, as_of_utc: new Date().toISOString() });
+    }
+
+    // ── /api/market-news ────────────────────────────────────────────────────
+    // General market headlines for the "Market & News" page. Tries Finnhub
+    // first, then falls back to Yahoo Finance (no key needed). Cached 30 min.
+    if (pathname === "/api/market-news" && request.method === "GET") {
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const cached = await getNewsCacheEntry(env.DB, "market:general:v2", todayStr, 1800);
+      if (cached && cached.length) return json({ articles: cached, news_enabled: true });
+
+      let articles: unknown[] = [];
+      if (env.FINNHUB_KEY) {
+        articles = await fetchGeneralNews("general", env.FINNHUB_KEY);
+      }
+      if (!articles.length) {
+        // Aggregate broad-market headlines across a few index queries, then
+        // de-duplicate by title and order newest-first.
+        const settled = await Promise.allSettled([
+          fetchYahooNews("S&P 500", 8),
+          fetchYahooNews("Nasdaq", 8),
+          fetchYahooNews("Dow Jones", 6),
+          fetchYahooNews("Federal Reserve", 6),
+        ]);
+        const seen = new Set<string>();
+        const merged: Array<{ title: string; ts: number }> = [];
+        for (const r of settled) {
+          if (r.status !== "fulfilled") continue;
+          for (const a of r.value) {
+            const key = a.title.toLowerCase();
+            if (seen.has(key)) continue;
+            seen.add(key);
+            merged.push(a);
+          }
+        }
+        merged.sort((x, y) => (y.ts || 0) - (x.ts || 0));
+        articles = merged.slice(0, 14);
+      }
+      if (articles.length) {
+        ctx.waitUntil(upsertNewsCache(env.DB, "market:general:v2", todayStr, articles));
+      }
+      return json({ articles, news_enabled: true });
+    }
+
     // ── /api/stock-analysis ─────────────────────────────────────────────────
     // Full bars + EMA/volume overlays + pattern annotation for the detail
     // chart on page 05. Symbol here is a raw Yahoo ticker (no .US suffix).
+    // Supports daily, weekly and intraday (30m / 60m) timeframes.
     if (pathname === "/api/stock-analysis" && request.method === "GET") {
       const symbol = (url.searchParams.get("symbol") || "").trim().toUpperCase();
-      const range = url.searchParams.get("range") || "1y";
-      const validRanges = ["3mo", "6mo", "1y", "2y", "5y"];
-      const rng = validRanges.includes(range) ? range : "1y";
       if (!symbol) return err("Missing symbol");
 
-      const bars = await fetchYahooOHLCV(symbol, rng, "1d");
-      if (!bars.length) return json({ symbol, range: rng, bars: [], metrics: null });
+      // Timeframe presets keep the front-end honest about Yahoo's range/
+      // interval pairings (intraday windows are short).
+      const tf = url.searchParams.get("tf") || "d1y";
+      const TF: Record<string, { range: string; interval: string }> = {
+        m30: { range: "1mo", interval: "30m" },
+        h1:  { range: "3mo", interval: "60m" },
+        d6m: { range: "6mo", interval: "1d" },
+        d1y: { range: "1y",  interval: "1d" },
+        d2y: { range: "2y",  interval: "1d" },
+        w1:  { range: "5y",  interval: "1wk" },
+      };
+      const preset = TF[tf] || TF.d1y;
+
+      const bars = await fetchYahooOHLCV(symbol, preset.range, preset.interval);
+      if (!bars.length) return json({ symbol, tf, interval: preset.interval, bars: [], metrics: null });
 
       const closes = bars.map((b) => b.close);
       const e8 = ema(closes, 8);
       const e21 = ema(closes, 21);
       const e50 = ema(closes, 50);
 
-      // Compute metrics over the full window (preferred 2y for stable ATR/RSI).
-      const fullBars = rng === "2y" || rng === "5y"
-        ? bars
-        : (await fetchYahooOHLCV(symbol, "2y", "1d")) || bars;
-      const metrics = computeMetrics(symbol, fullBars.length ? fullBars : bars);
+      // Metrics (ADR/ATR/RSI/patterns/stops) are ALWAYS computed on daily bars
+      // over a 2y window, regardless of the chart timeframe, so the swing plan
+      // stays consistent when the user flips to weekly / intraday views.
+      const dailyBars = await fetchYahooOHLCV(symbol, "2y", "1d");
+      const metrics = computeMetrics(symbol, dailyBars.length ? dailyBars : bars);
 
       return json({
-        symbol, range: rng,
+        symbol, tf, interval: preset.interval,
         bars: bars.map((b, i) => ({
           date: b.date, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume,
           ema8: e8[i], ema21: e21[i], ema50: e50[i],

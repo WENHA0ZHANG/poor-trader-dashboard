@@ -876,6 +876,91 @@
       }
       @media (max-width: 1024px) { .wl-grid { grid-template-columns: 1fr; } }
 
+      /* Row 1: Today's Special Focus (left) + chart detail (right) */
+      .wl-top-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+        gap: 14px;
+        align-items: start;
+        margin-bottom: 14px;
+      }
+      /* Row 2: My Watchlist (left, wider) + market timing & glossary (right) */
+      .wl-bottom-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+        gap: 14px;
+        align-items: start;
+      }
+      .wl-side { display: flex; flex-direction: column; gap: 14px; }
+      /* In the narrow side column, stack the index tiles vertically. */
+      .wl-side .wl-timing-grid { grid-template-columns: 1fr; }
+      @media (max-width: 1024px) {
+        .wl-top-grid, .wl-bottom-grid { grid-template-columns: 1fr; }
+        .wl-side .wl-timing-grid { grid-template-columns: repeat(3, 1fr); }
+      }
+      @media (max-width: 680px) {
+        .wl-side .wl-timing-grid { grid-template-columns: 1fr; }
+      }
+
+      /* Market timing tiles (SPY / QQQ) */
+      .wl-timing-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        padding: 12px 14px 14px;
+      }
+      @media (max-width: 860px) { .wl-timing-grid { grid-template-columns: 1fr; } }
+      .wl-timing-tile {
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        padding: 14px 16px;
+        background: var(--panel);
+        position: relative;
+        overflow: hidden;
+      }
+      .wl-timing-tile::before {
+        content: "";
+        position: absolute; left: 0; top: 0; bottom: 0; width: 4px;
+        background: var(--border-strong);
+      }
+      .wl-timing-tile.t-on::before   { background: var(--bull); box-shadow: 0 0 14px var(--bull); }
+      .wl-timing-tile.t-mild::before { background: #86efac; }
+      .wl-timing-tile.t-neutral::before { background: var(--warning); }
+      .wl-timing-tile.t-off::before  { background: var(--bear); box-shadow: 0 0 14px var(--bear); }
+      .wl-timing-tile .wt-top {
+        display: flex; justify-content: space-between; align-items: baseline;
+      }
+      .wl-timing-tile .wt-name {
+        font-size: 13px; font-weight: 600; color: var(--text-strong);
+        letter-spacing: 0.02em;
+      }
+      .wl-timing-tile .wt-price {
+        font-size: 18px; font-weight: 700; color: var(--text-strong);
+      }
+      .wl-timing-tile .wt-price .wt-chg { font-size: 12px; font-weight: 600; margin-left: 8px; }
+      .wl-timing-tile .wt-price .wt-chg.up { color: var(--bull); }
+      .wl-timing-tile .wt-price .wt-chg.down { color: var(--bear); }
+      .wl-timing-tile .wt-status {
+        display: inline-block;
+        margin-top: 10px;
+        font-size: 12px; font-weight: 700;
+        text-transform: uppercase; letter-spacing: 0.06em;
+        padding: 3px 10px; border-radius: 3px;
+      }
+      .wl-timing-tile.t-on .wt-status   { color: var(--bull); background: var(--bull-soft); }
+      .wl-timing-tile.t-mild .wt-status { color: #86efac; background: rgba(34,197,94,0.10); }
+      .wl-timing-tile.t-neutral .wt-status { color: var(--warning); background: var(--warning-soft); }
+      .wl-timing-tile.t-off .wt-status  { color: var(--bear); background: var(--bear-soft); }
+      .wl-timing-tile .wt-emas {
+        display: flex; gap: 14px; margin-top: 12px;
+        font-size: 11px; color: var(--muted);
+        flex-wrap: wrap;
+      }
+      .wl-timing-tile .wt-emas b { color: var(--text); font-weight: 600; }
+      .wl-timing-tile .wt-note {
+        margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.5;
+      }
+
       .wl-focus-card {
         border: 1px solid var(--border);
         background: linear-gradient(180deg, rgba(251, 191, 36, 0.06), rgba(0,0,0,0));
@@ -940,6 +1025,7 @@
       .wl-tag.t-vol2 { color: #fde68a; border-color: rgba(251, 191, 36, 0.9); background: rgba(251, 191, 36, 0.22); }
       .wl-tag.t-htf { color: var(--bull); border-color: rgba(34, 197, 94, 0.6); background: var(--bull-soft); }
       .wl-tag.t-bull { color: var(--bull); border-color: rgba(34, 197, 94, 0.4); }
+      .wl-tag.t-cup { color: #c4b5fd; border-color: rgba(167, 139, 250, 0.5); }
       .wl-tag.t-hve { color: var(--accent); border-color: rgba(96, 165, 250, 0.5); }
       .wl-tag.t-ext { color: var(--bear); border-color: rgba(239, 68, 68, 0.5); background: var(--bear-soft); }
       .wl-tag.t-trend { color: var(--neutral); }
@@ -1000,13 +1086,17 @@
       }
       .wl-table-card tr.wl-row { cursor: pointer; }
       .wl-table-card tr.wl-row:hover td { background: rgba(255,255,255,0.04); }
-      .wl-table-card tr.wl-row.is-active td {
-        background: rgba(96, 165, 250, 0.10);
-        box-shadow: inset 2px 0 0 var(--accent);
-      }
       .wl-table-card tr.wl-row.is-hot td {
         background: rgba(251, 191, 36, 0.08);
       }
+      /* Full-row highlight for the selected stock (no left bar). */
+      .wl-table-card tr.wl-row.is-active td,
+      .wl-table-card tr.wl-row.is-active:hover td,
+      .wl-table-card tr.wl-row.is-active.is-hot td {
+        background: rgba(96, 165, 250, 0.22);
+        color: var(--text-strong);
+      }
+      .wl-table-card tr.wl-row.is-active .wl-sym-cell { color: #bfdbfe; }
       .wl-table-card .wl-vr-bad { color: var(--warning); font-weight: 700; }
       .wl-table-card .wl-vr-up { color: var(--bull); font-weight: 600; }
       .wl-table-card .wl-sym-cell { font-weight: 700; color: var(--text-strong); }
@@ -1123,7 +1213,7 @@
       .wl-detail-controls button:hover { color: var(--text); }
       .wl-detail-chart-wrap { padding: 8px 14px 6px; }
       #wl-detail-chart { width: 100%; height: 380px; }
-      #wl-detail-vol { width: 100%; height: 90px; margin-top: -8px; }
+      #wl-detail-vol { width: 100%; height: 132px; margin-top: -8px; }
 
       .wl-legend {
         display: flex; gap: 14px; padding: 4px 18px 14px;
@@ -1139,6 +1229,27 @@
       .wl-legend .lg-dot.stop { background: var(--bear); }
       .wl-legend .lg-dot.tp { background: var(--bull); }
       .wl-legend .lg-dot.pivot { background: #d4d4d4; }
+      .wl-legend-hint {
+        padding: 6px 18px 14px; font-size: 10.5px; color: var(--muted);
+        line-height: 1.5;
+      }
+      .wl-legend-hint b { color: var(--text); font-weight: 600; }
+
+      /* Market & News — headline list */
+      .market-news-list {
+        display: grid; grid-template-columns: repeat(2, 1fr);
+        gap: 0 22px; padding: 6px 16px 14px;
+      }
+      @media (max-width: 760px) { .market-news-list { grid-template-columns: 1fr; } }
+      .mn-item {
+        display: block; padding: 9px 0; border-bottom: 1px solid var(--border);
+        text-decoration: none; color: inherit;
+      }
+      .mn-item:hover .mn-title { color: var(--accent); }
+      .mn-title { font-size: 13px; line-height: 1.4; color: var(--text); font-weight: 500; }
+      .mn-sub { margin-top: 3px; font-size: 11px; color: var(--muted); }
+      .mn-sub .mn-src { color: #a3a3a3; font-weight: 600; }
+      .mn-empty { padding: 8px 16px 14px; color: var(--muted); font-size: 12px; }
 
       .wl-intro {
         padding: 12px 18px;
@@ -1181,17 +1292,17 @@
         <button class="tab-btn active" data-tab="prediction" role="tab" aria-selected="true">
           <span class="tab-num">01</span>Prediction
         </button>
-        <button class="tab-btn" data-tab="market" role="tab" aria-selected="false">
-          <span class="tab-num">02</span>Market
+        <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false">
+          <span class="tab-num">02</span>Watchlist
         </button>
         <button class="tab-btn" data-tab="global" role="tab" aria-selected="false">
-          <span class="tab-num">03</span>Global Map &amp; News
+          <span class="tab-num">03</span>Global Map
+        </button>
+        <button class="tab-btn" data-tab="market" role="tab" aria-selected="false">
+          <span class="tab-num">04</span>Market &amp; News
         </button>
         <button class="tab-btn" data-tab="signals" role="tab" aria-selected="false">
-          <span class="tab-num">04</span>Signals &amp; History
-        </button>
-        <button class="tab-btn" data-tab="watchlist" role="tab" aria-selected="false">
-          <span class="tab-num">05</span>Watchlist
+          <span class="tab-num">05</span>Signals &amp; History
         </button>
         <div class="navbar-clock" id="navbar-clock" aria-hidden="true">
           <span class="clock-date" id="clock-date">--</span>
@@ -1243,8 +1354,18 @@
       </div>
       </section>
 
-      <!-- ============== Page 2: Market (tables LEFT, click-to-detail RIGHT) ============== -->
+      <!-- ============== Page 4: Market & News ============== -->
       <section class="page" data-page="market" role="tabpanel">
+
+      <div class="card market-news-card" style="margin-bottom: 14px;">
+        <h2>Market Headlines
+          <span class="meta" id="market-news-meta" style="float:right; font-weight:400;">—</span>
+        </h2>
+        <div id="market-news-list" class="market-news-list">
+          <div class="mn-empty">Loading market headlines…</div>
+        </div>
+      </div>
+
       <div class="grid-market">
         <div class="market-tables">
           <div class="card mini-card">
@@ -1350,12 +1471,12 @@
       </div>
       </section>
 
-      <!-- ============== Page 3: Global Map & News ============== -->
+      <!-- ============== Page 3: Global Map ============== -->
       <section class="page" data-page="global" role="tabpanel">
       <div class="grid">
         <div class="card" style="grid-column: span 2;">
           <h2>
-            Global Market Map &amp; News
+            Global Market Map
             <span id="world-asof" class="meta" style="margin-left: 8px; font-weight: 400;"></span>
             <span class="map-toolbar" role="toolbar" aria-label="Map zoom controls">
               <button id="map-zoom-out" type="button" title="Zoom out">−</button>
@@ -1511,39 +1632,55 @@
       </div>
       </section>
 
-      <!-- ============== Page 5: Watchlist (Swing-trading assistant) ============== -->
+      <!-- ============== Page 2: Watchlist (Swing-trading assistant) ============== -->
       <section class="page" data-page="watchlist" role="tabpanel">
-      <div class="card" style="margin-bottom: 14px;">
-        <div class="wl-intro">
-          A swing-trading assistant for your own stock repository. Add tickers below;
-          the dashboard re-scans them every ~30&nbsp;min and surfaces names that look
-          interesting — <b>2&times; (or more) average daily volume</b>, fresh all-time
-          volume highs, tight high-base consolidations, etc. — at the very top.
-          Click any row to see the chart with annotated EMA8 / EMA21 / EMA50, a
-          suggested stop and two partial-profit targets, and any detected base
-          structure. <i>This is an analytics aid only, not investment advice.</i>
-          <div class="wl-glossary">
-            <div class="gl-item"><code>LOD</code> Low of Day</div>
-            <div class="gl-item"><code>ADR</code> Average Daily Range</div>
-            <div class="gl-item"><code>ATR</code> Average True Range</div>
-            <div class="gl-item"><code>RSI</code> Relative Strength Index (14)</div>
-            <div class="gl-item"><code>HVE</code> Highest Volume Ever (in window)</div>
-            <div class="gl-item"><code>HTF</code> High Tight Flag (heuristic)</div>
-            <div class="gl-item"><code>VolR</code> Today's volume vs. prior 21-day average</div>
-            <div class="gl-item"><code>Stop / TP1 / TP2</code> Suggested stop and +3R / +5R targets</div>
+
+      <!-- Row 1: Today's Special Focus (left) + chart detail (right) -->
+      <div class="wl-top-grid">
+        <div class="card wl-focus-card">
+          <h2><span class="wl-focus-icon"></span>Today's Special Focus
+            <span class="meta" id="wl-focus-meta" style="float:right; font-weight:400;">—</span>
+          </h2>
+          <div id="wl-focus-empty" class="wl-focus-empty">No watchlist names trigger the focus criteria right now.</div>
+          <div id="wl-focus-list" class="wl-focus-list" style="display:none;"></div>
+        </div>
+
+        <div class="card wl-detail-card" id="wl-detail-card">
+          <div id="wl-detail-empty" class="wl-detail-empty">
+            Pick a stock from My Watchlist below to see the chart, key
+            metrics and a suggested swing plan.
+          </div>
+          <div id="wl-detail-body" style="display:none;">
+            <div class="wl-detail-header">
+              <div>
+                <div class="wd-name"><span id="wd-name">—</span><small id="wd-meta"></small><span id="wd-pattern"></span></div>
+              </div>
+              <div>
+                <div class="wd-price" id="wd-price">—</div>
+                <div class="wd-chg" id="wd-chg"></div>
+              </div>
+            </div>
+            <div class="wl-key-metrics" id="wl-key-metrics"></div>
+            <div class="wl-plan-banner" id="wl-plan-banner"></div>
+            <div class="wl-detail-controls" id="wl-detail-controls">
+              <button data-tf="m30">30M</button>
+              <button data-tf="h1">1H</button>
+              <button data-tf="d6m">6M</button>
+              <button data-tf="d1y" class="active">1D · 1Y</button>
+              <button data-tf="d2y">1D · 2Y</button>
+              <button data-tf="w1">Weekly</button>
+            </div>
+            <div class="wl-detail-chart-wrap">
+              <div id="wl-detail-chart"></div>
+              <div id="wl-detail-vol"></div>
+            </div>
+            <div class="wl-legend-hint">EMA 8 / 21 / 50 shown by default · click <b>Stop</b>, <b>TP1</b>, <b>TP2</b>, <b>Pivot</b> in the legend to toggle · drag the bar under volume to zoom the time range</div>
           </div>
         </div>
       </div>
 
-      <div class="card wl-focus-card" style="margin-bottom: 14px;">
-        <h2><span class="wl-focus-icon"></span>Today's Special Focus
-          <span class="meta" id="wl-focus-meta" style="float:right; font-weight:400;">—</span>
-        </h2>
-        <div id="wl-focus-empty" class="wl-focus-empty">No watchlist names trigger the focus criteria right now.</div>
-        <div id="wl-focus-list" class="wl-focus-list" style="display:none;"></div>
-      </div>
-
-      <div class="wl-grid">
+      <!-- Row 2: My Watchlist (left, wider) + market timing & glossary (right) -->
+      <div class="wl-bottom-grid">
         <div class="card wl-table-card">
           <h2>My Watchlist
             <a href="#" id="wl-reload-link" onclick="loadWatchlist(true); return false;">Reload</a>
@@ -1574,40 +1711,34 @@
           </table>
         </div>
 
-        <div class="card wl-detail-card" id="wl-detail-card">
-          <div id="wl-detail-empty" class="wl-detail-empty">
-            Pick a stock from your watchlist on the left to see the chart, key
-            metrics and a suggested swing plan.
+        <div class="wl-side">
+          <div class="card wl-timing-card">
+            <h2>Market Timing
+              <span class="meta" id="wl-timing-meta" style="float:right; font-weight:400;">—</span>
+            </h2>
+            <div class="wl-timing-grid" id="wl-timing-grid">
+              <div class="wl-timing-tile" data-loading="1"><div class="wt-name">S&amp;P 500 · SPY</div><div class="wt-status">Loading…</div></div>
+              <div class="wl-timing-tile" data-loading="1"><div class="wt-name">Nasdaq 100 · QQQ</div><div class="wt-status">Loading…</div></div>
+              <div class="wl-timing-tile" data-loading="1"><div class="wt-name">Dow 30 · DIA</div><div class="wt-status">Loading…</div></div>
+            </div>
           </div>
-          <div id="wl-detail-body" style="display:none;">
-            <div class="wl-detail-header">
-              <div>
-                <div class="wd-name"><span id="wd-name">—</span><small id="wd-meta"></small><span id="wd-pattern"></span></div>
+
+          <div class="card">
+            <div class="wl-intro">
+              <div class="wl-glossary">
+                <div class="gl-item"><code>LOD</code> Low of Day</div>
+                <div class="gl-item"><code>ADR</code> Average Daily Range</div>
+                <div class="gl-item"><code>ATR</code> Average True Range</div>
+                <div class="gl-item"><code>PEG</code> Power Earnings Gap</div>
+                <div class="gl-item"><code>HVE</code> Highest Volume Ever</div>
+                <div class="gl-item"><code>HTF</code> High Tight Flag</div>
+                <div class="gl-item"><code>Cup&amp;H</code> Cup &amp; Handle base</div>
+                <div class="gl-item"><code>RSI</code> Relative Strength Index (14)</div>
+                <div class="gl-item"><code>VolR</code> Volume vs. 21-day average</div>
+                <div class="gl-item"><code>Stop / TP1 / TP2</code> Suggested stop and +3R / +5R targets</div>
+                <div class="gl-item"><code>R</code> Risk (entry − stop) per share</div>
+                <div class="gl-item"><code>(W)</code> Pattern detected on the weekly timeframe</div>
               </div>
-              <div>
-                <div class="wd-price" id="wd-price">—</div>
-                <div class="wd-chg" id="wd-chg"></div>
-              </div>
-            </div>
-            <div class="wl-key-metrics" id="wl-key-metrics"></div>
-            <div class="wl-plan-banner" id="wl-plan-banner"></div>
-            <div class="wl-detail-controls" id="wl-detail-controls">
-              <button data-range="3mo">3M</button>
-              <button data-range="6mo">6M</button>
-              <button data-range="1y" class="active">1Y</button>
-              <button data-range="2y">2Y</button>
-            </div>
-            <div class="wl-detail-chart-wrap">
-              <div id="wl-detail-chart"></div>
-              <div id="wl-detail-vol"></div>
-            </div>
-            <div class="wl-legend">
-              <span><span class="lg-dot e8"></span>EMA 8</span>
-              <span><span class="lg-dot e21"></span>EMA 21</span>
-              <span><span class="lg-dot e50"></span>EMA 50</span>
-              <span><span class="lg-dot stop"></span>Stop</span>
-              <span><span class="lg-dot tp"></span>TP1 / TP2</span>
-              <span><span class="lg-dot pivot"></span>Base / Pivot</span>
             </div>
           </div>
         </div>
@@ -3469,15 +3600,25 @@
         let wlVolChart = null;
         let wlCurrentSymbol = null;
         let wlCurrentName = null;
-        let wlCurrentRange = "1y";
+        let wlCurrentTf = "d1y";
+        let wlCurrentInterval = "1d";
         let wlInited = false;
+
+        // Timeframe presets — must match the server-side TF map in stock-analysis.
+        const WL_TF_INTERVAL = {
+          m30: "30m", h1: "60m", d6m: "1d", d1y: "1d", d2y: "1d", w1: "1wk",
+        };
 
         const WL_TAG_LABELS = {
           VOL_DOUBLED: { label: "Vol 2×+", cls: "t-vol2" },
           VOL_SURGE:   { label: "Vol Up",  cls: "t-vol" },
           HVE:         { label: "HVE",     cls: "t-hve" },
           HTF:         { label: "HTF",     cls: "t-htf" },
+          HTF_W:       { label: "HTF (W)", cls: "t-htf" },
           BULL_FLAG:   { label: "Bull Flag", cls: "t-bull" },
+          BULL_FLAG_W: { label: "Bull Flag (W)", cls: "t-bull" },
+          CUP_HANDLE:  { label: "Cup & Handle", cls: "t-cup" },
+          CUP_HANDLE_W:{ label: "Cup & Handle (W)", cls: "t-cup" },
           STRONG_1M:   { label: "+30% 1M", cls: "t-trend" },
           TREND_UP:    { label: "Up Trend", cls: "t-trend" },
           EXTENDED:    { label: "Extended", cls: "t-ext" },
@@ -3545,6 +3686,96 @@
           } catch (e) {
             tbody.innerHTML = `<tr><td colspan="9" class="meta">Network error.</td></tr>`;
           }
+        }
+
+        function _mnTimeAgo(iso) {
+          if (!iso) return "";
+          const t = new Date(iso).getTime();
+          if (Number.isNaN(t)) return "";
+          const mins = Math.round((Date.now() - t) / 60000);
+          if (mins < 1) return "just now";
+          if (mins < 60) return mins + "m ago";
+          const hrs = Math.round(mins / 60);
+          if (hrs < 24) return hrs + "h ago";
+          return Math.round(hrs / 24) + "d ago";
+        }
+
+        async function loadMarketNews() {
+          const list = document.getElementById("market-news-list");
+          const meta = document.getElementById("market-news-meta");
+          if (!list) return;
+          try {
+            const resp = await fetch(`${window.API_BASE||""}/api/market-news`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const arts = (data && data.articles) || [];
+            if (!data.news_enabled) {
+              list.innerHTML = `<div class="mn-empty">News feed is not configured.</div>`;
+              if (meta) meta.textContent = "";
+              return;
+            }
+            if (!arts.length) {
+              list.innerHTML = `<div class="mn-empty">No headlines available right now.</div>`;
+              return;
+            }
+            if (meta) meta.textContent = "General market · " + arts.length + " stories";
+            const esc = (s) => String(s || "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+            list.innerHTML = arts.map(a => {
+              const ago = _mnTimeAgo(a.datetime);
+              const src = esc(a.source);
+              const sub = [src ? `<span class="mn-src">${src}</span>` : "", ago].filter(Boolean).join(" · ");
+              return `<a class="mn-item" href="${esc(a.url)}" target="_blank" rel="noopener">
+                <div class="mn-title">${esc(a.title)}</div>
+                <div class="mn-sub">${sub}</div>
+              </a>`;
+            }).join("");
+          } catch (e) { /* ignore */ }
+        }
+
+        async function loadMarketTiming() {
+          const grid = document.getElementById("wl-timing-grid");
+          const meta = document.getElementById("wl-timing-meta");
+          if (!grid) return;
+          try {
+            const resp = await fetch(`${window.API_BASE||""}/api/market-timing`);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            const rows = data.rows || [];
+            if (meta) {
+              meta.textContent = data.as_of_utc
+                ? "Daily · 8 / 21 / 50 EMA · " + new Date(data.as_of_utc).toLocaleString(undefined, { hour: "2-digit", minute: "2-digit", month: "short", day: "numeric" })
+                : "Daily · 8 / 21 / 50 EMA";
+            }
+            grid.innerHTML = rows.map(r => {
+              if (!r || !r.ok) {
+                return `<div class="wl-timing-tile"><div class="wt-name">${(r && r.name) || "—"}</div><div class="wt-status">No data</div></div>`;
+              }
+              const chgCls = _wlChgClass(r.chg_1d_pct);
+              const stackTxt = r.stacked
+                ? "EMA 8 &gt; 21 &gt; 50 (stacked up)"
+                : (r.above_21ema ? "Above 21 EMA, not fully stacked" : "Below 21 EMA");
+              const noteMap = {
+                on:      "Trend aligned to the upside — the most constructive backdrop for long swing entries.",
+                mild:    "Holding above the 21 EMA with positive short-term momentum.",
+                neutral: "Above the 21 EMA but momentum is mixed — be selective.",
+                off:     "Below the 21 EMA — defensive backdrop; long setups carry lower odds.",
+              };
+              return `<div class="wl-timing-tile t-${r.tier}">
+                <div class="wt-top">
+                  <span class="wt-name">${r.name}</span>
+                  <span class="wt-price">${_wlFmt(r.price)}<span class="wt-chg ${chgCls}">${_wlFmtPct(r.chg_1d_pct)}</span></span>
+                </div>
+                <span class="wt-status">${r.status}</span>
+                <div class="wt-emas">
+                  <span>Price <b>${_wlFmt(r.price)}</b></span>
+                  <span>EMA8 <b>${_wlFmt(r.ema8)}</b></span>
+                  <span>EMA21 <b>${_wlFmt(r.ema21)}</b></span>
+                  <span>EMA50 <b>${_wlFmt(r.ema50)}</b></span>
+                </div>
+                <div class="wt-note">${stackTxt}. ${noteMap[r.tier] || ""}</div>
+              </div>`;
+            }).join("");
+          } catch (e) { /* ignore */ }
         }
 
         function renderWatchlistFocus() {
@@ -3694,7 +3925,9 @@
 
           // Pattern pill
           const pp = document.getElementById("wd-pattern");
-          if (m.high_tight_flag) {
+          if (m.pattern_label) {
+            pp.innerHTML = `<span class="wl-pattern-pill">${m.pattern_label}</span>`;
+          } else if (m.high_tight_flag) {
             pp.innerHTML = `<span class="wl-pattern-pill">High-Tight Base</span>`;
           } else if (m.bull_flag) {
             pp.innerHTML = `<span class="wl-pattern-pill">Bull-Flag Base</span>`;
@@ -3744,10 +3977,10 @@
           }
         }
 
-        async function loadWatchlistDetail(symbol, range) {
+        async function loadWatchlistDetail(symbol, tf) {
           if (!symbol) return;
           wlCurrentSymbol = symbol;
-          if (range) wlCurrentRange = range;
+          if (tf) { wlCurrentTf = tf; wlCurrentInterval = WL_TF_INTERVAL[tf] || "1d"; }
           document.getElementById("wl-detail-empty").style.display = "none";
           document.getElementById("wl-detail-body").style.display = "block";
 
@@ -3762,12 +3995,12 @@
             wlCurrentName = cached.name || symbol;
           }
 
-          // Range buttons
+          // Timeframe buttons
           document.querySelectorAll("#wl-detail-controls button").forEach(b =>
-            b.classList.toggle("active", b.dataset.range === wlCurrentRange));
+            b.classList.toggle("active", b.dataset.tf === wlCurrentTf));
 
           try {
-            const url = `${window.API_BASE||""}/api/stock-analysis?symbol=${encodeURIComponent(symbol)}&range=${encodeURIComponent(wlCurrentRange)}`;
+            const url = `${window.API_BASE||""}/api/stock-analysis?symbol=${encodeURIComponent(symbol)}&tf=${encodeURIComponent(wlCurrentTf)}`;
             const resp = await fetch(url);
             if (!resp.ok) return;
             const data = await resp.json();
@@ -3830,29 +4063,59 @@
             volAvg.push(valid.length ? Math.round(valid.reduce((s, v) => s + v, 0) / valid.length) : null);
           }
 
-          // Stop / TP / pivot markings (anchored at the latest date).
-          const last = bars[bars.length - 1];
-          const markLines = [];
-          if (m.stop != null) markLines.push({ name: "Stop", yAxis: m.stop, lineStyle: { color: "#ef4444", type: "dashed", width: 1 }, label: { formatter: `Stop ${m.stop}`, color: "#ef4444", position: "insideEndTop", fontSize: 10 } });
-          if (m.tp1 != null) markLines.push({ name: "TP1", yAxis: m.tp1, lineStyle: { color: "#22c55e", type: "dashed", width: 1 }, label: { formatter: `TP1 ${m.tp1}`, color: "#22c55e", position: "insideEndTop", fontSize: 10 } });
-          if (m.tp2 != null) markLines.push({ name: "TP2", yAxis: m.tp2, lineStyle: { color: "#22c55e", type: "dotted", width: 1 }, label: { formatter: `TP2 ${m.tp2}`, color: "#22c55e", position: "insideEndTop", fontSize: 10 } });
-          if (m.pivot != null) markLines.push({ name: "Pivot", yAxis: m.pivot, lineStyle: { color: "#d4d4d4", type: "dotted", width: 1 }, label: { formatter: `Pivot ${m.pivot}`, color: "#d4d4d4", position: "insideEndTop", fontSize: 10 } });
+          // Stop / TP / pivot levels become their own horizontal line series so
+          // they can be toggled from the legend (hidden by default). Each is a
+          // flat array spanning every bar with an end label showing the price.
+          const flatLine = (val) => dates.map(() => val);
+          const overlaySeries = [];
+          const mkLevel = (name, val, color, dash) => {
+            if (val == null) return;
+            overlaySeries.push({
+              name, type: "line", data: flatLine(val), showSymbol: false,
+              lineStyle: { color, type: dash, width: 1 }, silent: true,
+              endLabel: { show: true, formatter: `${name} ${val}`, color, fontSize: 10 },
+              emphasis: { disabled: true },
+            });
+          };
+          mkLevel("Stop", m.stop, "#ef4444", "dashed");
+          mkLevel("TP1", m.tp1, "#22c55e", "dashed");
+          mkLevel("TP2", m.tp2, "#22c55e", "dotted");
+          mkLevel("Pivot", m.pivot, "#d4d4d4", "dotted");
 
-          // Highlight the detected base region.
+          // Highlight the detected base region. The pattern dates are daily
+          // (YYYY-MM-DD), so the shaded band only lines up on the daily charts.
+          const interval = (data && data.interval) || "1d";
+          const isIntraday = interval === "30m" || interval === "60m";
           const markAreas = [];
           const pat = m.pattern;
-          if (pat && pat.flag_start && pat.flag_end) {
+          if (interval === "1d" && pat && pat.flag_start && pat.flag_end) {
+            const baseName = pat.label || (pat.high_tight_flag ? "High-Tight Base" : "Base");
             markAreas.push([
-              { name: pat.high_tight_flag ? "High-Tight Base" : "Base", xAxis: pat.flag_start,
+              { name: baseName, xAxis: pat.flag_start,
                 itemStyle: { color: pat.high_tight_flag ? "rgba(34,197,94,0.10)" : "rgba(96,165,250,0.08)" },
                 label: { show: true, color: "#a3a3a3", fontSize: 10, position: "insideTop" } },
               { xAxis: pat.flag_end },
             ]);
           }
 
+          // x-axis label formatter adapts to the timeframe.
+          const xLabelFmt = (v) => {
+            if (!v) return "";
+            if (isIntraday) return v.length > 10 ? v.slice(5, 16) : v; // MM-DD HH:MM
+            return v.slice(0, 7); // YYYY-MM
+          };
+
           wlDetailChart.setOption({
             backgroundColor: "transparent",
             animation: false,
+            legend: {
+              show: true, top: 0, left: "center",
+              itemWidth: 18, itemHeight: 2, itemGap: 12,
+              textStyle: { color: "#a3a3a3", fontSize: 11 },
+              inactiveColor: "#525252",
+              data: ["EMA 8", "EMA 21", "EMA 50", "Stop", "TP1", "TP2", "Pivot"],
+              selected: { "Stop": false, "TP1": false, "TP2": false, "Pivot": false },
+            },
             tooltip: {
               trigger: "axis",
               axisPointer: { type: "cross", lineStyle: { color: "#525252", type: "dashed" } },
@@ -3885,12 +4148,15 @@
                 return html;
               },
             },
-            grid: { left: 55, right: 16, top: 18, bottom: 28 },
+            grid: { left: 55, right: 52, top: 30, bottom: 28 },
+            dataZoom: [
+              { type: "inside", xAxisIndex: [0], filterMode: "filter" },
+            ],
             xAxis: {
               type: "category", data: dates,
               axisLine: { lineStyle: { color: "#3f3f3f" } },
               axisLabel: { color: "#a3a3a3", fontSize: 11, hideOverlap: true,
-                formatter: (v) => v ? v.slice(0, 7) : "" },
+                formatter: xLabelFmt },
               splitLine: { show: false },
               axisTick: { show: false },
             },
@@ -3907,11 +4173,6 @@
                   color: "#22c55e", color0: "#ef4444",
                   borderColor: "#22c55e", borderColor0: "#ef4444",
                 },
-                markLine: {
-                  symbol: "none",
-                  data: markLines,
-                  silent: true,
-                },
                 markArea: {
                   silent: true,
                   data: markAreas,
@@ -3920,6 +4181,7 @@
               { name: "EMA 8",  type: "line", data: ema8,  showSymbol: false, lineStyle: { color: "#60a5fa", width: 1.2 }, smooth: false },
               { name: "EMA 21", type: "line", data: ema21, showSymbol: false, lineStyle: { color: "#fbbf24", width: 1.2 }, smooth: false },
               { name: "EMA 50", type: "line", data: ema50, showSymbol: false, lineStyle: { color: "#a78bfa", width: 1.2 }, smooth: false },
+              ...overlaySeries,
             ],
           }, true);
 
@@ -3946,12 +4208,23 @@
                 return html;
               },
             },
-            grid: { left: 55, right: 16, top: 6, bottom: 22 },
+            grid: { left: 55, right: 52, top: 6, bottom: 40 },
+            dataZoom: [
+              { type: "inside", xAxisIndex: [0], filterMode: "filter" },
+              { type: "slider", xAxisIndex: [0], height: 16, bottom: 6,
+                brushSelect: false, borderColor: "#3f3f3f",
+                fillerColor: "rgba(96,165,250,0.12)",
+                handleStyle: { color: "#60a5fa", borderColor: "#60a5fa" },
+                moveHandleStyle: { color: "#60a5fa" },
+                dataBackground: { lineStyle: { color: "#3f3f3f" }, areaStyle: { color: "#1f1f1f" } },
+                selectedDataBackground: { lineStyle: { color: "#60a5fa" }, areaStyle: { color: "rgba(96,165,250,0.10)" } },
+                textStyle: { color: "#737373", fontSize: 9 } },
+            ],
             xAxis: {
               type: "category", data: dates,
               axisLine: { lineStyle: { color: "#3f3f3f" } },
               axisLabel: { color: "#a3a3a3", fontSize: 10, hideOverlap: true,
-                formatter: (v) => v ? v.slice(5) : "" },
+                formatter: xLabelFmt },
               splitLine: { show: false },
               axisTick: { show: false },
             },
@@ -3973,13 +4246,13 @@
         }
 
         function initWatchlist() {
-          // Range buttons
+          // Timeframe buttons
           document.querySelectorAll("#wl-detail-controls button").forEach(btn => {
             btn.addEventListener("click", () => {
-              const r = btn.dataset.range;
-              if (!r || r === wlCurrentRange) return;
-              if (wlCurrentSymbol) loadWatchlistDetail(wlCurrentSymbol, r);
-              else wlCurrentRange = r;
+              const tf = btn.dataset.tf;
+              if (!tf || tf === wlCurrentTf) return;
+              if (wlCurrentSymbol) loadWatchlistDetail(wlCurrentSymbol, tf);
+              else { wlCurrentTf = tf; wlCurrentInterval = WL_TF_INTERVAL[tf] || "1d"; }
             });
           });
           // Enter-to-add
@@ -3998,7 +4271,7 @@
         window.addWatchlistSymbol = addWatchlistSymbol;
 
         // ---- Tab navigation ----
-        const TAB_IDS = ["prediction", "market", "global", "signals", "watchlist"];
+        const TAB_IDS = ["prediction", "watchlist", "market", "global", "signals"];
         const DEFAULT_TAB = "prediction";
 
         function switchTab(name, push) {
@@ -4088,6 +4361,8 @@
           loadSignalsAndRegime();
           initWatchlist();
           loadWatchlist(false);
+          loadMarketTiming();
+          loadMarketNews();
 
           // ── Background auto-refresh ───────────────────────────────────────
           // Pull whatever the Worker (cron) has already written into D1.
@@ -4106,6 +4381,8 @@
                 typeof loadSignalsAndRegime === "function" ? loadSignalsAndRegime() : null,
                 typeof loadMarketOverview === "function" ? loadMarketOverview() : null,
                 typeof loadWatchlist === "function" ? loadWatchlist(false) : null,
+                typeof loadMarketTiming === "function" ? loadMarketTiming() : null,
+                typeof loadMarketNews === "function" ? loadMarketNews() : null,
               ]);
             } catch (e) {
               console.error("autoRefreshTick:", e);
