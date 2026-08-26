@@ -1124,6 +1124,14 @@
         line-height: 1;
       }
       .wl-table-card .wl-rm-btn:hover { color: var(--bear); }
+      .wl-table-card .wl-grip {
+        color: var(--muted); margin-right: 6px; cursor: grab;
+        font-size: 11px; opacity: 0.55; user-select: none;
+      }
+      .wl-table-card tr.wl-row:hover .wl-grip { opacity: 0.9; }
+      .wl-table-card tr.wl-row.wl-dragging { opacity: 0.4; }
+      .wl-table-card tr.wl-row.wl-drop-before td { box-shadow: inset 0 2px 0 var(--accent); }
+      .wl-table-card tr.wl-row.wl-drop-after td { box-shadow: inset 0 -2px 0 var(--accent); }
 
       /* Detail card */
       .wl-detail-card { align-self: start; }
@@ -1134,18 +1142,22 @@
         padding: 14px 18px 4px;
         display: grid;
         grid-template-columns: 1fr auto;
-        align-items: end;
+        align-items: start;
       }
+      .wl-detail-header .wd-right { text-align: right; }
       .wl-detail-header .wd-name {
         font-size: 22px; font-weight: 700; color: var(--text-strong);
-        letter-spacing: -0.01em;
+        letter-spacing: -0.01em; line-height: 1.1;
       }
       .wl-detail-header .wd-name small {
         font-weight: 400; color: var(--muted); margin-left: 8px;
         font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em;
       }
+      .wl-detail-header .wd-pattern { margin-top: 4px; min-height: 16px; }
+      .wl-detail-header .wd-pattern:empty { min-height: 0; }
       .wl-detail-header .wd-price {
         font-size: 28px; font-weight: 600; color: var(--text-strong);
+        line-height: 1.1;
       }
       .wl-detail-header .wd-chg {
         font-size: 12px; font-weight: 600;
@@ -1669,10 +1681,11 @@
           </div>
           <div id="wl-detail-body" style="display:none;">
             <div class="wl-detail-header">
-              <div>
-                <div class="wd-name"><span id="wd-name">—</span><small id="wd-meta"></small><span id="wd-pattern"></span></div>
+              <div class="wd-left">
+                <div class="wd-name"><span id="wd-name">—</span><small id="wd-meta"></small></div>
+                <div class="wd-pattern" id="wd-pattern"></div>
               </div>
-              <div>
+              <div class="wd-right">
                 <div class="wd-price" id="wd-price">—</div>
                 <div class="wd-chg" id="wd-chg"></div>
               </div>
@@ -3701,10 +3714,11 @@
             if (wlCurrentSymbol) {
               const r = (wlData.rows || []).find(r => r.symbol === wlCurrentSymbol);
               if (r) renderWatchlistDetailHeader(r);
-            } else if ((wlData.rows || []).length) {
-              // Default the detail chart to the first watchlist name so the
-              // panel is never an empty placeholder.
-              loadWatchlistDetail(wlData.rows[0].symbol);
+            } else {
+              // Default the detail chart to the first name in Today's Special
+              // Focus; if nothing is flagged, fall back to SPY.
+              const firstFocus = (wlData.focus || [])[0];
+              loadWatchlistDetail(firstFocus ? firstFocus.symbol : "SPY");
             }
             _wlSyncHeights();
           } catch (e) {
@@ -3846,22 +3860,16 @@
             tbody.innerHTML = `<tr><td colspan="9" class="meta">No tickers yet — add one above.</td></tr>`;
             return;
           }
-          // Sort: hot first, then alphabetical.
-          const sorted = rows.slice().sort((a, b) => {
-            const sa = (a.metrics && a.metrics.focus_score) || 0;
-            const sb = (b.metrics && b.metrics.focus_score) || 0;
-            if (sa !== sb) return sb - sa;
-            return a.symbol.localeCompare(b.symbol);
-          });
-          tbody.innerHTML = sorted.map(r => {
+          // Render in the persisted (drag) order returned by the server.
+          tbody.innerHTML = rows.map(r => {
             const m = r.metrics || {};
             const isActive = r.symbol === wlCurrentSymbol;
             const isHot = (m.focus_score || 0) >= 4;
             const chg1d = m.chg_1d_pct;
             const chg1w = m.chg_1w_pct;
             const chg1m = m.chg_1m_pct;
-            return `<tr class="wl-row ${isActive ? "is-active" : ""} ${isHot ? "is-hot" : ""}" data-sym="${r.symbol}">
-              <td class="wl-sym-cell">${r.symbol}${r.note ? `<small>${_escHtml(r.note)}</small>` : ""}</td>
+            return `<tr class="wl-row ${isActive ? "is-active" : ""} ${isHot ? "is-hot" : ""}" data-sym="${r.symbol}" draggable="true">
+              <td class="wl-sym-cell"><span class="wl-grip" title="Drag to reorder">⠿</span>${r.symbol}${r.note ? `<small>${_escHtml(r.note)}</small>` : ""}</td>
               <td>${_wlFmt(m.price)}</td>
               <td class="${_wlChgClass(chg1d)}" style="color:${_chgColor(chg1d)}">${_wlFmtPct(chg1d)}</td>
               <td class="${_wlChgClass(chg1w)}" style="color:${_chgColor(chg1w)}">${_wlFmtPct(chg1w)}</td>
@@ -3877,6 +3885,7 @@
               if (ev.target && ev.target.classList && ev.target.classList.contains("wl-rm-btn")) return;
               loadWatchlistDetail(tr.dataset.sym);
             });
+            _wlWireDrag(tr);
           });
           tbody.querySelectorAll(".wl-rm-btn").forEach(btn => {
             btn.addEventListener("click", (ev) => {
@@ -3884,6 +3893,66 @@
               removeWatchlistSymbol(btn.dataset.rm);
             });
           });
+        }
+
+        // ── Drag-to-reorder for My Watchlist rows ────────────────────────────
+        let _wlDragSym = null;
+        function _wlWireDrag(tr) {
+          tr.addEventListener("dragstart", (e) => {
+            _wlDragSym = tr.dataset.sym;
+            tr.classList.add("wl-dragging");
+            try { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", _wlDragSym); } catch (err) {}
+          });
+          tr.addEventListener("dragend", () => {
+            tr.classList.remove("wl-dragging");
+            _wlClearDropMarks();
+          });
+          tr.addEventListener("dragover", (e) => {
+            if (!_wlDragSym || tr.dataset.sym === _wlDragSym) return;
+            e.preventDefault();
+            try { e.dataTransfer.dropEffect = "move"; } catch (err) {}
+            const after = _wlIsAfter(tr, e.clientY);
+            _wlClearDropMarks();
+            tr.classList.add(after ? "wl-drop-after" : "wl-drop-before");
+          });
+          tr.addEventListener("drop", (e) => {
+            if (!_wlDragSym || tr.dataset.sym === _wlDragSym) return;
+            e.preventDefault();
+            const after = _wlIsAfter(tr, e.clientY);
+            _wlClearDropMarks();
+            _wlApplyReorder(_wlDragSym, tr.dataset.sym, after);
+            _wlDragSym = null;
+          });
+        }
+        function _wlIsAfter(tr, clientY) {
+          const rect = tr.getBoundingClientRect();
+          return clientY > rect.top + rect.height / 2;
+        }
+        function _wlClearDropMarks() {
+          document.querySelectorAll(".wl-row.wl-drop-before, .wl-row.wl-drop-after")
+            .forEach(el => el.classList.remove("wl-drop-before", "wl-drop-after"));
+        }
+        function _wlApplyReorder(dragSym, targetSym, placeAfter) {
+          const rows = wlData.rows || [];
+          const from = rows.findIndex(r => r.symbol === dragSym);
+          if (from < 0) return;
+          const [moved] = rows.splice(from, 1);
+          let to = rows.findIndex(r => r.symbol === targetSym);
+          if (to < 0) { rows.splice(from, 0, moved); return; }
+          rows.splice(placeAfter ? to + 1 : to, 0, moved);
+          renderWatchlistTable();
+          _wlPersistOrder();
+        }
+        async function _wlPersistOrder() {
+          const order = (wlData.rows || []).map(r => r.symbol);
+          if (!order.length) return;
+          try {
+            await fetch(`${window.API_BASE||""}/api/watchlist/reorder`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ order }),
+            });
+          } catch (e) { /* best-effort */ }
         }
 
         async function addWatchlistSymbol() {
@@ -4030,10 +4099,16 @@
             if (!resp.ok) return;
             const data = await resp.json();
             const m = data.metrics;
-            if (m && cached) {
-              // Merge fresh metrics into the cached row's display
-              cached.metrics = m;
-              renderWatchlistDetailHeader(cached);
+            if (m) {
+              if (cached) {
+                // Merge fresh metrics into the cached row's display
+                cached.metrics = m;
+                renderWatchlistDetailHeader(cached);
+              } else {
+                // Symbol not in the watchlist (e.g. the SPY fallback): build a
+                // header straight from the analysis payload.
+                renderWatchlistDetailHeader({ symbol, name: symbol, metrics: m });
+              }
             }
             renderWatchlistChart(data);
           } catch (e) { /* ignore */ }

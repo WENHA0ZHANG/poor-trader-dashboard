@@ -13,6 +13,7 @@ import {
   getWatchlist,
   addWatchlistSymbol,
   removeWatchlistSymbol,
+  reorderWatchlist,
   getWatchlistMetrics,
   upsertWatchlistMetrics,
 } from "./lib/db";
@@ -744,6 +745,17 @@ export default {
     if (pathname === "/api/watchlist/refresh" && request.method === "POST") {
       const wrote = await refreshWatchlistMetrics(env);
       return json({ ok: true, wrote });
+    }
+
+    // ── /api/watchlist/reorder ──────────────────────────────────────────────
+    // Persist the user's manual drag order. Body: { order: ["NVDA", ...] }.
+    if (pathname === "/api/watchlist/reorder" && request.method === "POST") {
+      const body = await request.json().catch(() => ({})) as { order?: unknown };
+      const order = Array.isArray(body.order)
+        ? body.order.map((s) => String(s).toUpperCase()).filter(Boolean)
+        : [];
+      if (order.length) await reorderWatchlist(env.DB, order);
+      return json({ ok: true, count: order.length });
     }
 
     // ── /api/market-timing ──────────────────────────────────────────────────

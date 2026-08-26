@@ -233,10 +233,23 @@ export interface WatchlistRow {
 }
 
 export async function getWatchlist(db: D1Database): Promise<WatchlistRow[]> {
+  // Manual drag order (sort_order) takes precedence; rows without a saved
+  // position fall back to insertion order.
   const rows = await db
-    .prepare(`SELECT symbol, name, note, added_at FROM watchlist ORDER BY added_at ASC`)
+    .prepare(
+      `SELECT symbol, name, note, added_at FROM watchlist
+       ORDER BY (sort_order IS NULL), sort_order ASC, added_at ASC`,
+    )
     .all<WatchlistRow>();
   return rows.results;
+}
+
+export async function reorderWatchlist(db: D1Database, symbols: string[]): Promise<void> {
+  if (!symbols.length) return;
+  const stmts = symbols.map((sym, i) =>
+    db.prepare(`UPDATE watchlist SET sort_order = ? WHERE symbol = ?`).bind(i, sym),
+  );
+  await db.batch(stmts);
 }
 
 export async function addWatchlistSymbol(

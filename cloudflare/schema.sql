@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS watchlist (
   symbol TEXT PRIMARY KEY,
   name TEXT,
   note TEXT,
-  added_at TEXT NOT NULL
+  added_at TEXT NOT NULL,
+  sort_order INTEGER
 );
 
 -- Cached computed metrics for each watchlist symbol (refreshed by cron / on
